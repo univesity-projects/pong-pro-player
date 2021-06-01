@@ -18,8 +18,8 @@ def sprite_load_scaled(path, scale):
 class Entity:
 
     def __init__(self, x, y, width, height, speed, sprite, parent):
-        self.x = x
-        self.y = y
+        self.x = x - width / 2
+        self.y = y - height / 2
         self.width = width
         self.height = height
         self.speed = speed
@@ -30,23 +30,30 @@ class Entity:
         pass
 
     def render(self):
-        self.parent.screen.blit(self.sprite, (self.get_center_x(), self.get_center_y()))
+        # print('---\nx: ', self.x, '\ny: ', self.y)
+        self.parent.screen.blit(self.sprite, (self.x, self.y))
 
-    def get_center_x(self):
-        return self.x - self.width / 2
+    def set_x(self, x):
+        self.x = x - self.width / 2
 
-    def get_center_y(self):
-        return self.y - self.height / 2
+    def set_y(self, y):
+        self.y = y - self.height / 2
+
+    def get_x(self):
+        return self.x + self.width / 2
+
+    def get_y(self):
+        return self.y + self.height / 2
 
     def up_collision(self):
-        if self.y - self.height / 2 <= 0:
-            self.y = self.height / 2
+        if self.y <= 0:
+            self.y = 0
             return True
         return False
 
     def down_collision(self):
-        if self.y + self.height / 2 >= self.parent.DISPLAY_HEIGHT:
-            self.y = self.parent.DISPLAY_HEIGHT - self.height / 2
+        if self.y + self.height >= self.parent.DISPLAY_HEIGHT:
+            self.y = self.parent.DISPLAY_HEIGHT - self.height
             return True
         return False
 
@@ -67,9 +74,9 @@ class Racket(Entity):
 
     def update_ia(self, delta):
         ball = self.parent.ball
-        if ball.y < self.y and not self.up_collision():
+        if ball.get_y() < self.get_y() and not self.up_collision():
             self.y -= self.speed * delta
-        elif ball.y > self.y and not self.down_collision():
+        elif ball.get_y() > self.get_y() and not self.down_collision():
             self.y += self.speed * delta
 
 
@@ -88,9 +95,9 @@ class Ball(Entity):
         self.collision()
 
     def collision(self):
-        ball_rect = pygame.rect.Rect((self.get_center_x(), self.get_center_y(), self.width, self.height))
-        racket_left_rect = pygame.rect.Rect((self.racket_left.get_center_x(), self.racket_left.get_center_y(), self.racket_left.width, self.racket_left.height))
-        racket_right_rect = pygame.rect.Rect((self.racket_right.get_center_x(), self.racket_right.get_center_y(), self.racket_right.width, self.racket_right.height))
+        ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
+        racket_left_rect = pygame.rect.Rect((self.racket_left.x, self.racket_left.y, self.racket_left.width, self.racket_left.height))
+        racket_right_rect = pygame.rect.Rect((self.racket_right.x, self.racket_right.y, self.racket_right.width, self.racket_right.height))
         angle_in_degrees = 0
         if ball_rect.colliderect(racket_left_rect):
             # print('left')
@@ -101,8 +108,8 @@ class Ball(Entity):
             # print('right')
             angle_in_degrees = 135
 
-            ball_y = self.get_center_y()
-            racket_y = self.racket_right.get_center_y()
+            ball_y = self.get_y()
+            racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
 
             print('ball y: ', ball_y)
@@ -122,8 +129,8 @@ class Ball(Entity):
     def generate(self):
         self.x_speed = 150
         return
-        self.x = self.parent.DISPLAY_WIDTH / 2
-        self.y = random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height)
+        self.set_x(self.parent.DISPLAY_WIDTH / 2)
+        self.set_y(random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height))
         if random.randint(0, 1) == 0:
             self.set_angle(math.radians(random.randint(35, 125)))
         else:
@@ -185,7 +192,7 @@ class Pong:
 
         # control
         self.running = False
-        self.effects = True
+        self.effects = False
         self.player = False
         self.state = self.STATE_MAIN_MENU
         self.menu_op = 0
@@ -286,9 +293,10 @@ class Pong:
         pygame.display.flip()
 
     def start_match(self):
-        self.racket_left.y = self.DISPLAY_HEIGHT / 2
-        self.racket_right.y = self.DISPLAY_HEIGHT / 2
+        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
+        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
         self.ball.generate()
+        pass
 
     def draw_score(self):
         x_left = 200
