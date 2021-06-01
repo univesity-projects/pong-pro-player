@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pygame as pg
+import pygame
+import math
+import random
+import time
 import operator
 import os
 
 
 def sprite_load_scaled(path, scale):
-    sprite = pg.image.load(path)
-    sprite = pg.transform.scale(sprite, (sprite.get_width() * scale, sprite.get_height() * scale))
+    sprite = pygame.image.load(path)
+    sprite = pygame.transform.scale(sprite, (sprite.get_width() * scale, sprite.get_height() * scale))
     return sprite
 
 
@@ -23,35 +26,119 @@ class Entity:
         self.sprite = sprite
         self.parent = parent
 
-    def update(self):
+    def update(self, delta):
         pass
 
     def render(self):
-        self.parent.screen.blit(self.sprite, (self.x - self.width / 2, self.y - self.height / 2))
+        self.parent.screen.blit(self.sprite, (self.get_center_x(), self.get_center_y()))
+
+    def get_center_x(self):
+        return self.x - self.width / 2
+
+    def get_center_y(self):
+        return self.y - self.height / 2
+
+    def up_collision(self):
+        if self.y - self.height / 2 <= 0:
+            self.y = self.height / 2
+            return True
+        return False
+
+    def down_collision(self):
+        if self.y + self.height / 2 >= self.parent.DISPLAY_HEIGHT:
+            self.y = self.parent.DISPLAY_HEIGHT - self.height / 2
+            return True
+        return False
+
+
+class Racket(Entity):
+
+    up = False
+    down = False
+
+    def __init__(self, x, y, width, height, speed, sprite, parent):
+        Entity.__init__(self, x, y, width, height, speed, sprite, parent)
+
+    def update(self, delta):
+        if self.up and not self.up_collision():
+            self.y -= self.speed * delta
+        elif self.down and not self.down_collision():
+            self.y += self.speed * delta
+
+    def update_ia(self, delta):
+        ball = self.parent.ball
+        if ball.y < self.y and not self.up_collision():
+            self.y -= self.speed * delta
+        elif ball.y > self.y and not self.down_collision():
+            self.y += self.speed * delta
 
 
 class Ball(Entity):
 
     def __init__(self, x, y, width, height, speed, sprite, parent):
         Entity.__init__(self, x, y, width, height, speed, sprite, parent)
+        self.racket_left = self.parent.racket_left
+        self.racket_right = self.parent.racket_right
+        self.x_speed = 0
+        self.y_speed = 0
 
-    def update(self):
-        pass
+    def update(self, delta):
+        self.x += self.x_speed * delta
+        self.y += self.y_speed * delta
+        self.collision()
 
+    def collision(self):
+        ball_rect = pygame.rect.Rect((self.get_center_x(), self.get_center_y(), self.width, self.height))
+        racket_left_rect = pygame.rect.Rect((self.racket_left.get_center_x(), self.racket_left.get_center_y(), self.racket_left.width, self.racket_left.height))
+        racket_right_rect = pygame.rect.Rect((self.racket_right.get_center_x(), self.racket_right.get_center_y(), self.racket_right.width, self.racket_right.height))
+        angle_in_degrees = 0
+        if ball_rect.colliderect(racket_left_rect):
+            # print('left')
+            angle_in_degrees = -45
 
-class Racket(Entity):
+            self.set_angle(math.radians(angle_in_degrees))
+        elif ball_rect.colliderect(racket_right_rect):
+            # print('right')
+            angle_in_degrees = 135
 
-    def __init__(self, x, y, width, height, speed, sprite, parent):
-        Entity.__init__(self, x, y, width, height, speed, sprite, parent)
+            ball_y = self.get_center_y()
+            racket_y = self.racket_right.get_center_y()
+            racket_height = self.racket_right.height
 
-    def update(self):
-        pass
+            print('ball y: ', ball_y)
+            print('raq y: ', racket_y)
+
+            if ball_y < racket_y:
+                print('menor')
+            elif ball_y == racket_y:
+                print('center')
+            elif ball_y > racket_y:
+                print('maior')
+
+            self.set_angle(math.radians(angle_in_degrees))
+        if self.up_collision() or self.down_collision():
+            self.y_speed *= -1
+
+    def generate(self):
+        self.x_speed = 150
+        return
+        self.x = self.parent.DISPLAY_WIDTH / 2
+        self.y = random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height)
+        if random.randint(0, 1) == 0:
+            self.set_angle(math.radians(random.randint(35, 125)))
+        else:
+            self.set_angle(math.radians(random.randint(-125, 35)))
+
+    def set_angle(self, angle_in_radians):
+        self.x_speed = self.speed * math.cos(angle_in_radians)
+        self.y_speed = self.speed * math.sin(angle_in_radians)
 
 
 class Pong:
 
     # constants
     BLACK = (0, 0, 0)
+    DARK_GRAY = (50, 50, 50)
     WHITE = (255, 255, 255)
     SCALE = 8
     DISPLAY_WIDTH = 800
@@ -63,11 +150,12 @@ class Pong:
 
     def __init__(self):
         # print(os.getcwd())
-        pg.init()
-        icon = pg.image.load('src/res/icon.png')
-        pg.display.set_icon(icon)
-        pg.display.set_caption("Pong")
-        self.screen = pg.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
+        pygame.init()
+        icon = pygame.image.load('src/res/icon.png')
+        pygame.display.set_icon(icon)
+        pygame.display.set_caption("Pong")
+        self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
+        random.seed(time.time())
 
         # keys
         self.k_up = False
@@ -78,21 +166,22 @@ class Pong:
         self.k_esc = False
 
         # sprites
-        self.sprite_scanline = pg.image.load('src/res/sprite/scanline_overlay.png')
-        self.sprite_tv_vignette = pg.image.load('src/res/sprite/tv_vignette_overlay.png')
+        self.clean_color = self.DARK_GRAY
+        self.sprite_scanline = pygame.image.load('src/res/sprite/scanline_overlay.png')
+        self.sprite_tv_vignette = pygame.image.load('src/res/sprite/tv_vignette_overlay.png')
         self. sprite_num = []
         for i in range(10):
             self.sprite_num.append(sprite_load_scaled('src/res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
         self.sprite_net = sprite_load_scaled('src/res/sprite/net.png', self.SCALE)
         sprite_ball = sprite_load_scaled('src/res/sprite/ball.png', self.SCALE)
         sprite_racket = sprite_load_scaled('src/res/sprite/racket.png', self.SCALE)
-        self.font_title = pg.font.Font('src/res/font/bit5x3.ttf', 128)
-        self.font = pg.font.Font('src/res/font/bit5x3.ttf', 32)
+        self.font_title = pygame.font.Font('src/res/font/bit5x3.ttf', 128)
+        self.font = pygame.font.Font('src/res/font/bit5x3.ttf', 32)
 
         # objects
-        self.ball = Ball(400, 300, 16, 16, 5, sprite_ball, self)
-        self.racket_left = Racket(50, 300, 16, 64, 5, sprite_racket, self)
-        self.racket_right = Racket(750, 300, 16, 64, 5, sprite_racket, self)
+        self.racket_left = Racket(50, 300, 16, 64, 250, sprite_racket, self)
+        self.racket_right = Racket(750, 300, 16, 64, 250, sprite_racket, self)
+        self.ball = Ball(400, 300, 16, 16, 250, sprite_ball, self)
 
         # control
         self.running = False
@@ -102,57 +191,84 @@ class Pong:
         self.menu_op = 0
         self.score_left = 0
         self.score_right = 0
+        self.clock = pygame.time.Clock()
+        self.delta = 0
+        self.elapsed = 0
 
     def run(self):
         self.running = True
 
         # main loop
         while self.running:
+            self.delta = self.elapsed / 1000.0
             self.update()
             self.render()
+            self.elapsed = self.clock.tick(60)
 
-        pg.quit()
+        pygame.quit()
 
     def update(self):
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pg.KEYDOWN:
-                if event.key == pg.K_UP:
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
                     self.k_up = True
-                elif event.key == pg.K_DOWN:
+                elif event.key == pygame.K_DOWN:
                     self.k_down = True
-                elif event.key == pg.K_w:
+                elif event.key == pygame.K_w:
                     self.k_w = True
-                elif event.key == pg.K_s:
+                elif event.key == pygame.K_s:
                     self.k_s = True
-                elif event.key == pg.K_KP_ENTER:
+                elif event.key == pygame.K_RETURN:
                     self.k_enter = True
-                elif event.key == pg.K_ESCAPE:
+                elif event.key == pygame.K_ESCAPE:
                     self.k_esc = True
-            elif event.type == pg.KEYUP:
-                if event.key == pg.K_UP:
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_UP:
                     self.k_up = False
-                elif event.key == pg.K_DOWN:
+                elif event.key == pygame.K_DOWN:
                     self.k_down = False
-                elif event.key == pg.K_w:
+                elif event.key == pygame.K_w:
                     self.k_w = False
-                elif event.key == pg.K_s:
+                elif event.key == pygame.K_s:
                     self.k_s = False
-                elif event.key == pg.K_KP_ENTER:
+                elif event.key == pygame.K_RETURN:
                     self.k_enter = False
-                elif event.key == pg.K_ESCAPE:
+                elif event.key == pygame.K_ESCAPE:
                     self.k_esc = False
 
         if self.state == self.STATE_PLAYING:
-            pass
-        elif self.state == self.STATE_MAIN_MENU:
-            pass
-        elif self.state == self.STATE_PAUSE_MENU:
-            pass
+            if self.k_esc:
+                self.state = self.STATE_PAUSE_MENU
+            # self.racket_left.up = self.k_w
+            # self.racket_left.down = self.k_s
+            # self.racket_left.update(self.delta)
+            self.racket_left.update_ia(self.delta)
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
+            self.racket_right.update(self.delta)
+            self.ball.update(self.delta)
+        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU:
+            if self.k_up or self.k_w:
+                self.menu_op = 0
+            elif self.k_down or self.k_s:
+                self.menu_op = 1
+            if self.k_enter:
+                if self.menu_op == 0:
+                    if self.state == self.STATE_MAIN_MENU:
+                        self.start_match()
+                    self.state = self.STATE_PLAYING
+                else:
+                    if self.state == self.STATE_MAIN_MENU:
+                        self.running = False
+                    else:
+                        self.state = self.STATE_MAIN_MENU
+                    self.menu_op = 0
+                self.k_enter = False
 
     def render(self):
-        self.screen.fill((50, 50, 50))
+        self.screen.fill(self.clean_color)
 
         if self.state == self.STATE_PLAYING:
             self.draw_score()
@@ -164,8 +280,15 @@ class Pong:
 
         if self.effects:
             self.draw_overlay_effects()
+        else:
+            self.clean_color = self.BLACK
 
-        pg.display.flip()
+        pygame.display.flip()
+
+    def start_match(self):
+        self.racket_left.y = self.DISPLAY_HEIGHT / 2
+        self.racket_right.y = self.DISPLAY_HEIGHT / 2
+        self.ball.generate()
 
     def draw_score(self):
         x_left = 200
@@ -212,11 +335,11 @@ class Pong:
         if self.menu_op == 0:
             str1_r = self.font.render(str1, False, self.BLACK)
             str2_r = self.font.render(str2, False, self.WHITE)
-            pg.draw.rect(self.screen, self.WHITE, pos1)
+            pygame.draw.rect(self.screen, self.WHITE, pos1)
         else:
             str1_r = self.font.render(str1, False, self.WHITE)
             str2_r = self.font.render(str2, False, self.BLACK)
-            pg.draw.rect(self.screen, self.WHITE, pos2)
+            pygame.draw.rect(self.screen, self.WHITE, pos2)
         pos1 = tuple(map(operator.add, pos1, adjust))
         pos2 = tuple(map(operator.add, pos2, adjust))
         title = self.font_title.render(str3, False, self.WHITE)
