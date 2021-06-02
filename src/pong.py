@@ -93,6 +93,10 @@ class Ball(Entity):
         self.x += self.x_speed * delta
         self.y += self.y_speed * delta
         self.collision()
+        if self.get_x() > self.parent.DISPLAY_WIDTH:
+            self.parent.score_up(False)
+        elif self.get_x() < 0:
+            self.parent.score_up(True)
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
@@ -100,41 +104,64 @@ class Ball(Entity):
         racket_right_rect = pygame.rect.Rect((self.racket_right.x, self.racket_right.y, self.racket_right.width, self.racket_right.height))
         angle_in_degrees = 0
         if ball_rect.colliderect(racket_left_rect):
-            # print('left')
-            angle_in_degrees = -45
-
+            ball_y = self.get_y()
+            racket_y = self.racket_left.get_y()
+            racket_height = self.racket_left.height
+            if ball_y < racket_y and ball_y > racket_y - racket_height * 0.125:
+                angle_in_degrees = -15
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.250:
+                angle_in_degrees = -30
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.375:
+                angle_in_degrees = -45
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.500 - self.height:
+                angle_in_degrees = -60
+            elif ball_y == racket_y:
+                angle_in_degrees = 0
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.125:
+                angle_in_degrees = 15
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.250:
+                angle_in_degrees = 30
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.375:
+                angle_in_degrees = 45
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.500 + self.height:
+                angle_in_degrees = 60
             self.set_angle(math.radians(angle_in_degrees))
         elif ball_rect.colliderect(racket_right_rect):
-            # print('right')
-            angle_in_degrees = 135
-
             ball_y = self.get_y()
             racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
-
-            print('ball y: ', ball_y)
-            print('raq y: ', racket_y)
-
-            if ball_y < racket_y:
-                print('menor')
+            if ball_y < racket_y and ball_y > racket_y - racket_height * 0.125:
+                angle_in_degrees = -165
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.250:
+                angle_in_degrees = -150
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.375:
+                angle_in_degrees = -135
+            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.500 - self.height:
+                angle_in_degrees = -120
             elif ball_y == racket_y:
-                print('center')
-            elif ball_y > racket_y:
-                print('maior')
-
+                angle_in_degrees = 180
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.125:
+                angle_in_degrees = 165
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.250:
+                angle_in_degrees = 150
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.375:
+                angle_in_degrees = 135
+            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.500 + self.height:
+                angle_in_degrees = 120
             self.set_angle(math.radians(angle_in_degrees))
+
         if self.up_collision() or self.down_collision():
             self.y_speed *= -1
 
     def generate(self):
-        self.x_speed = 150
-        return
+        # self.x_speed = 150
+        # return
         self.set_x(self.parent.DISPLAY_WIDTH / 2)
         self.set_y(random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height))
         if random.randint(0, 1) == 0:
-            self.set_angle(math.radians(random.randint(35, 125)))
+            self.set_angle(math.radians(random.randint(-60, 60)))
         else:
-            self.set_angle(math.radians(random.randint(-125, 35)))
+            self.set_angle(math.radians(random.randint(-120, 120)))
 
     def set_angle(self, angle_in_radians):
         self.x_speed = self.speed * math.cos(angle_in_radians)
@@ -154,6 +181,9 @@ class Pong:
     STATE_PLAYING = 0
     STATE_MAIN_MENU = 1
     STATE_PAUSE_MENU = 2
+    STATE_SEL_MENU = 3
+    STATE_END_GAME = 4
+    STATE_WAIT = 5
 
     def __init__(self):
         # print(os.getcwd())
@@ -186,9 +216,9 @@ class Pong:
         self.font = pygame.font.Font('src/res/font/bit5x3.ttf', 32)
 
         # objects
-        self.racket_left = Racket(50, 300, 16, 64, 250, sprite_racket, self)
-        self.racket_right = Racket(750, 300, 16, 64, 250, sprite_racket, self)
-        self.ball = Ball(400, 300, 16, 16, 250, sprite_ball, self)
+        self.racket_left = Racket(50, 300, 16, 64, 500, sprite_racket, self)
+        self.racket_right = Racket(750, 300, 16, 64, 500, sprite_racket, self)
+        self.ball = Ball(400, 300, 16, 16, 500, sprite_ball, self)
 
         # control
         self.running = False
@@ -200,6 +230,7 @@ class Pong:
         self.score_right = 0
         self.clock = pygame.time.Clock()
         self.delta = 0
+        self.timer = 0
         self.elapsed = 0
 
     def run(self):
@@ -214,7 +245,32 @@ class Pong:
 
         pygame.quit()
 
+    def start_match(self):
+        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
+        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
+        self.ball.generate()
+
+    def score_up(self, right):
+        if right:
+            self.score_right += 1
+        else:
+            self.score_left += 1
+        self.state = self.STATE_WAIT
+        self.timer = 1
+
     def update(self):
+        self.update_events()
+
+        if self.state == self.STATE_PLAYING:
+            self.update_playing()
+        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MENU:
+            self.update_menus()
+        elif self.state == self.STATE_END_GAME:
+            self.update_end_game()
+        elif self.state == self.STATE_WAIT:
+            self.update_wait()
+
+    def update_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -245,45 +301,71 @@ class Pong:
                 elif event.key == pygame.K_ESCAPE:
                     self.k_esc = False
 
-        if self.state == self.STATE_PLAYING:
-            if self.k_esc:
-                self.state = self.STATE_PAUSE_MENU
-            # self.racket_left.up = self.k_w
-            # self.racket_left.down = self.k_s
-            # self.racket_left.update(self.delta)
+    def update_playing(self):
+        if self.k_esc:
+            self.state = self.STATE_PAUSE_MENU
+        if self.player:
+            self.racket_left.up = self.k_w
+            self.racket_left.down = self.k_s
+            self.racket_left.update(self.delta)
+        else:
             self.racket_left.update_ia(self.delta)
-            self.racket_right.up = self.k_up
-            self.racket_right.down = self.k_down
-            self.racket_right.update(self.delta)
-            self.ball.update(self.delta)
-        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU:
-            if self.k_up or self.k_w:
-                self.menu_op = 0
-            elif self.k_down or self.k_s:
-                self.menu_op = 1
-            if self.k_enter:
-                if self.menu_op == 0:
-                    if self.state == self.STATE_MAIN_MENU:
-                        self.start_match()
+        self.racket_right.up = self.k_up
+        self.racket_right.down = self.k_down
+        self.racket_right.update(self.delta)
+        self.ball.update(self.delta)
+        if self.score_right >= 11 or self.score_left >= 11:
+            self.state = self.STATE_END_GAME
+
+    def update_menus(self):
+        if self.k_up or self.k_w:
+            self.menu_op = 0
+        elif self.k_down or self.k_s:
+            self.menu_op = 1
+        if self.k_enter:
+            if self.menu_op == 0:
+                if self.state == self.STATE_MAIN_MENU:
+                    self.state = self.STATE_SEL_MENU
+                elif self.state == self.STATE_PAUSE_MENU:
                     self.state = self.STATE_PLAYING
+                elif self.state == self.STATE_SEL_MENU:
+                    self.state = self.STATE_PLAYING
+                    self.start_match()
+                    self.player = True
+            else:
+                if self.state == self.STATE_MAIN_MENU:
+                    self.running = False
+                elif self.state == self.STATE_SEL_MENU:
+                    self.state = self.STATE_PLAYING
+                    self.start_match()
+                    self.player = False
                 else:
-                    if self.state == self.STATE_MAIN_MENU:
-                        self.running = False
-                    else:
-                        self.state = self.STATE_MAIN_MENU
-                    self.menu_op = 0
-                self.k_enter = False
+                    self.state = self.STATE_MAIN_MENU
+                self.menu_op = 0
+            self.k_enter = False
+
+    def update_end_game(self):
+        if self.k_enter:
+            self.state = self.STATE_MAIN_MENU
+
+    def update_wait(self):
+        self.timer -= self.delta
+        if self.timer <= 0:
+            self.state = self.STATE_PLAYING
+            self.start_match()
 
     def render(self):
         self.screen.fill(self.clean_color)
 
-        if self.state == self.STATE_PLAYING:
+        if self.state == self.STATE_PLAYING or self.state == self.STATE_WAIT:
             self.draw_score()
             self.draw_net()
             self.draw_racket()
             self.draw_ball()
-        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU:
+        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MENU:
             self.draw_menu()
+        elif self.state == self.STATE_END_GAME:
+            self.draw_end_game()
 
         if self.effects:
             self.draw_overlay_effects()
@@ -292,20 +374,13 @@ class Pong:
 
         pygame.display.flip()
 
-    def start_match(self):
-        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
-        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
-        self.ball.generate()
-        pass
-
     def draw_score(self):
-        x_left = 200
-        x_right = 600
-        top = 50
-        half_width = 32
+        x_left = self.DISPLAY_WIDTH * 0.25
+        x_right = self.DISPLAY_WIDTH * 0.75
+        top = self.DISPLAY_HEIGHT * 0.1
+        half_width = self.sprite_num[self.score_left].get_width() / 2
         self.screen.blit(self.sprite_num[self.score_left], (x_left - half_width, top))
-        self.screen.blit(self.sprite_num[self.score_left], (x_right - half_width, top))
-        pass
+        self.screen.blit(self.sprite_num[self.score_right], (x_right - half_width, top))
 
     def draw_net(self):
         y = 20
@@ -326,6 +401,10 @@ class Pong:
             str1 = 'CONTINUE'
             str2 = 'BACK TO MAIN MENU'
             str3 = 'PAUSED'
+        elif self.state == self.STATE_SEL_MENU:
+            str1 = 'PLAYER VS. PLAYER'
+            str2 = 'PLAYER VS. MACHINE'
+            str3 = 'MODE'
         else:
             str1 = 'PLAY'
             str2 = 'EXIT'
@@ -355,6 +434,17 @@ class Pong:
         self.screen.blit(title, (int(self.DISPLAY_WIDTH / 2 - title_w / 2), 96))
         self.screen.blit(str1_r, pos1)
         self.screen.blit(str2_r, pos2)
+
+    def draw_end_game(self):
+        str1 = 'END GAME'
+        str2 = 'WINNER: ' + 'LEFT PLAYER' if self.score_left >= 11 else 'RIGHT PLAYER'
+        str3 = 'ENTER TO CONTINUE'
+        text1 = self.font_title.render(str1, False, self.WHITE)
+        text2 = self.font_title.render(str2, False, self.WHITE)
+        text3 = self.font_title.render(str3, False, self.WHITE)
+        self.screen.blit(text1, (int(self.DISPLAY_WIDTH / 2 - text1.get_width() / 2), 96))
+        self.screen.blit(text2, (int(self.DISPLAY_WIDTH / 2 - text2.get_width() / 2), 96))
+        self.screen.blit(text3, (int(self.DISPLAY_WIDTH / 2 - text3.get_width() / 2), 96))
 
     def draw_overlay_effects(self):
         self.screen.blit(self.sprite_scanline, (0, 0))
