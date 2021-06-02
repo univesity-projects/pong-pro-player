@@ -6,16 +6,12 @@ import math
 import random
 import time
 import operator
-import os
-
-
-def sprite_load_scaled(path, scale):
-    sprite = pygame.image.load(path)
-    sprite = pygame.transform.scale(sprite, (sprite.get_width() * scale, sprite.get_height() * scale))
-    return sprite
 
 
 class Entity:
+
+    # set and get functions are simulating an centered object
+    # to get or set the real x and y you've to set or get directly from respective var
 
     def __init__(self, x, y, width, height, speed, sprite, parent):
         self.x = x - width / 2
@@ -73,15 +69,18 @@ class Racket(Entity):
 
     def update_ia(self, delta):
         ball = self.parent.ball
+
+        # if the ball is coming to racket's' direction, it follow the ball
         if ball.x_speed < 0:
-            if ball.get_y() < self.get_y() and not self.up_collision():
+            if ball.get_y() < self.get_y() - ball.height and not self.up_collision():
                 self.y -= self.speed * delta
-            elif ball.get_y() > self.get_y() and not self.down_collision():
+            elif ball.get_y() > self.get_y() + ball.height and not self.down_collision():
                 self.y += self.speed * delta
+        # else the racket just go to the middle of screen
         else:
-            if self.get_y() > self.parent.DISPLAY_HEIGHT / 2:
+            if self.get_y() > self.parent.DISPLAY_HEIGHT / 2 + ball.height:
                 self.y -= self.speed * delta
-            elif self.get_y() < self.parent.DISPLAY_HEIGHT / 2:
+            elif self.get_y() < self.parent.DISPLAY_HEIGHT / 2 - ball.height:
                 self.y += self.speed * delta
 
 
@@ -98,80 +97,86 @@ class Ball(Entity):
     def update(self, delta):
         self.x += self.x_speed * delta
         self.y += self.y_speed * delta
+
         self.collision()
+
+        # check is some player did a score
         if self.get_x() > self.parent.DISPLAY_WIDTH:
-            self.parent.score_up(False)
+            self.parent.score_up(self.parent.PLAYER_LEFT)
             self.slaps = 0
         elif self.get_x() < 0:
             self.slaps = 0
-            self.parent.score_up(True)
+            self.parent.score_up(self.parent.PLAYER_RIGHT)
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
         racket_left_rect = pygame.rect.Rect((self.racket_left.x, self.racket_left.y, self.racket_left.width, self.racket_left.height))
         racket_right_rect = pygame.rect.Rect((self.racket_right.x, self.racket_right.y, self.racket_right.width, self.racket_right.height))
-        angle_in_degrees = 0
+
+        # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
-            ball_y = self.get_y()
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
-            if ball_y < racket_y and ball_y > racket_y - racket_height * 0.125:
-                angle_in_degrees = -15
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.250:
-                angle_in_degrees = -30
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.375:
-                angle_in_degrees = -45
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.500 - self.height:
-                angle_in_degrees = -60
-            elif ball_y == racket_y:
-                angle_in_degrees = 0
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.125:
-                angle_in_degrees = 15
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.250:
-                angle_in_degrees = 30
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.375:
-                angle_in_degrees = 45
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.500 + self.height:
-                angle_in_degrees = 60
-            self.set_angle(math.radians(angle_in_degrees))
-            self.slaps += 1
+            self.find_angle(0, racket_y, racket_height)
         elif ball_rect.colliderect(racket_right_rect):
-            ball_y = self.get_y()
             racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
-            if ball_y < racket_y and ball_y > racket_y - racket_height * 0.125:
-                angle_in_degrees = -165
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.250:
-                angle_in_degrees = -150
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.375:
-                angle_in_degrees = -135
-            elif ball_y < racket_y and ball_y > racket_y - racket_height * 0.500 - self.height:
-                angle_in_degrees = -120
-            elif ball_y == racket_y:
-                angle_in_degrees = 180
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.125:
-                angle_in_degrees = 165
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.250:
-                angle_in_degrees = 150
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.375:
-                angle_in_degrees = 135
-            elif ball_y > racket_y and ball_y < racket_y + racket_height * 0.500 + self.height:
-                angle_in_degrees = 120
-            self.set_angle(math.radians(angle_in_degrees))
-            self.slaps += 1
+            self.find_angle(1, racket_y, racket_height)
 
         if self.up_collision() or self.down_collision():
             self.y_speed *= -1
 
+    def find_angle(self, index, racket_y, racket_height):
+        # 0 left / 1 right
+        degrees = [[-15, -30, -45, -60, 0, 15, 30, 45, 60], [-165, -150, -135, -120, 180, 165, 150, 135, 120]]
+        ball_y = self.get_y()
+        angle_in_degrees = 0
+
+        # as in the original Pong, I divided the racket in 8 sections, returning a 90 degrees angle in the middle and
+        # an more and more closed angle following to the end
+        if racket_y > ball_y > racket_y - racket_height * 0.125:
+            angle_in_degrees = degrees[index][0]
+        elif racket_y > ball_y > racket_y - racket_height * 0.250:
+            angle_in_degrees = degrees[index][1]
+        elif racket_y > ball_y > racket_y - racket_height * 0.375:
+            angle_in_degrees = degrees[index][2]
+        elif racket_y > ball_y > racket_y - racket_height * 0.500 - self.height:
+            angle_in_degrees = degrees[index][3]
+        elif ball_y == racket_y:
+            angle_in_degrees = degrees[index][4]
+        elif racket_y < ball_y < racket_y + racket_height * 0.125:
+            angle_in_degrees = degrees[index][5]
+        elif racket_y < ball_y < racket_y + racket_height * 0.250:
+            angle_in_degrees = degrees[index][6]
+        elif racket_y < ball_y < racket_y + racket_height * 0.375:
+            angle_in_degrees = degrees[index][7]
+        elif racket_y < ball_y < racket_y + racket_height * 0.500 + self.height:
+            angle_in_degrees = degrees[index][8]
+
+        self.set_angle(math.radians(angle_in_degrees))
+        self.slaps += 1
+
     def generate(self):
-        # self.x_speed = 150
-        # return
+        player = self.parent.player_ball
+
         self.set_x(self.parent.DISPLAY_WIDTH / 2)
         self.set_y(random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height))
-        if random.randint(0, 1) == 0:
-            self.set_angle(math.radians(random.randint(-60, 60)))
+
+        if player != self.parent.NO_PLAYER:
+            if player == self.parent.PLAYER_LEFT:
+                angle = random.randint(120, 180)
+                angle = angle * -1 if random.randint(0, 1) == 0 else angle
+                self.set_angle(math.radians(angle))
+            else:
+                self.set_angle(math.radians(random.randint(-60, 60)))
         else:
-            self.set_angle(math.radians(random.randint(-120, 120)))
+            num = random.randint(0, 3)
+            if num == 0 or num == 2:
+                self.set_angle(math.radians(random.randint(-60, 60)))
+            elif num == 1:
+                self.set_angle(math.radians(random.randint(120, 180)))
+            elif num == 3:
+                self.set_angle(math.radians(random.randint(-180, -120)))
 
     def set_angle(self, angle_in_radians):
         speed = self.speed + (50 * self.slaps)
@@ -180,14 +185,21 @@ class Ball(Entity):
 
 
 class Pong:
-
     # constants
     BLACK = (0, 0, 0)
     DARK_GRAY = (25, 25, 25)
     WHITE = (255, 255, 255)
+
     SCALE = 8
     DISPLAY_WIDTH = 800
     DISPLAY_HEIGHT = 600
+
+    PLAYER_LEFT = 0
+    PLAYER_RIGHT = 1
+    NO_PLAYER = 2
+
+    PLAYER_VS_PLAYER = True
+    PLAYER_VS_MACHINE = False
 
     STATE_PLAYING = 0
     STATE_MAIN_MENU = 1
@@ -197,7 +209,6 @@ class Pong:
     STATE_WAIT = 5
 
     def __init__(self):
-        # print(os.getcwd())
         pygame.init()
         icon = pygame.image.load('src/res/icon.png')
         pygame.display.set_icon(icon)
@@ -217,12 +228,13 @@ class Pong:
         self.clean_color = self.DARK_GRAY
         self.sprite_scanline = pygame.image.load('src/res/sprite/scanline_overlay.png')
         self.sprite_tv_vignette = pygame.image.load('src/res/sprite/tv_vignette_overlay.png')
-        self. sprite_num = []
+        self.sprite_num = []
         for i in range(10):
-            self.sprite_num.append(sprite_load_scaled('src/res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
-        self.sprite_net = sprite_load_scaled('src/res/sprite/net.png', self.SCALE)
-        sprite_ball = sprite_load_scaled('src/res/sprite/ball.png', self.SCALE)
-        sprite_racket = sprite_load_scaled('src/res/sprite/racket.png', self.SCALE)
+            self.sprite_num.append(
+                self.sprite_load_scaled('src/res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
+        self.sprite_net = self.sprite_load_scaled('src/res/sprite/net.png', self.SCALE)
+        sprite_ball = self.sprite_load_scaled('src/res/sprite/ball.png', self.SCALE)
+        sprite_racket = self.sprite_load_scaled('src/res/sprite/racket.png', self.SCALE)
         self.font_title = pygame.font.Font('src/res/font/bit5x3.ttf', 128)
         self.font_mid = pygame.font.Font('src/res/font/bit5x3.ttf', 94)
         self.font = pygame.font.Font('src/res/font/bit5x3.ttf', 64)
@@ -237,8 +249,9 @@ class Pong:
         # control
         self.running = False
         self.effects = True
-        self.player = False
+        self.mode = False
         self.state = self.STATE_MAIN_MENU
+        self.player_ball = self.NO_PLAYER
         # self.state = self.STATE_END_GAME
         self.menu_op = 0
         self.score_left = 0
@@ -260,6 +273,12 @@ class Pong:
 
         pygame.quit()
 
+    @staticmethod
+    def sprite_load_scaled(path, scale):
+        sprite = pygame.image.load(path)
+        sprite = pygame.transform.scale(sprite, (sprite.get_width() * scale, sprite.get_height() * scale))
+        return sprite
+
     def restart(self):
         self.score_left = 0
         self.score_right = 0
@@ -270,11 +289,14 @@ class Pong:
         self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
         self.ball.generate()
 
-    def score_up(self, right):
-        if right:
-            self.score_right += 1
-        else:
+    def score_up(self, player):
+        if player == self.PLAYER_LEFT:
             self.score_left += 1
+            self.player_ball = self.PLAYER_RIGHT
+        else:
+            self.score_right += 1
+            self.player_ball = self.PLAYER_LEFT
+
         self.state = self.STATE_WAIT
         self.timer = 1
 
@@ -324,16 +346,19 @@ class Pong:
     def update_playing(self):
         if self.k_esc:
             self.state = self.STATE_PAUSE_MENU
-        if self.player:
+
+        if self.mode == self.PLAYER_VS_PLAYER:
             self.racket_left.up = self.k_w
             self.racket_left.down = self.k_s
             self.racket_left.update(self.delta)
         else:
             self.racket_left.update_ia(self.delta)
+
         self.racket_right.up = self.k_up
         self.racket_right.down = self.k_down
         self.racket_right.update(self.delta)
         self.ball.update(self.delta)
+
         if self.score_right >= 11 or self.score_left >= 11:
             self.state = self.STATE_END_GAME
 
@@ -342,6 +367,7 @@ class Pong:
             self.menu_op = 0
         elif self.k_down or self.k_s:
             self.menu_op = 1
+
         if self.k_enter:
             if self.menu_op == 0:
                 if self.state == self.STATE_MAIN_MENU:
@@ -351,22 +377,23 @@ class Pong:
                 elif self.state == self.STATE_SEL_MENU:
                     self.state = self.STATE_PLAYING
                     self.restart()
-                    self.player = True
+                    self.mode = self.PLAYER_VS_PLAYER
             else:
                 if self.state == self.STATE_MAIN_MENU:
                     self.running = False
                 elif self.state == self.STATE_SEL_MENU:
                     self.state = self.STATE_PLAYING
                     self.restart()
-                    self.player = False
+                    self.mode = self.PLAYER_VS_MACHINE
                 else:
                     self.state = self.STATE_MAIN_MENU
                 self.menu_op = 0
             self.k_enter = False
 
     def update_end_game(self):
-        if self.k_esc:
+        if self.k_enter:
             self.state = self.STATE_MAIN_MENU
+            self.k_enter = False
 
     def update_wait(self):
         self.timer -= self.delta
@@ -400,6 +427,7 @@ class Pong:
         top = self.DISPLAY_HEIGHT * 0.1
         half_width = self.sprite_num[0].get_width() / 2
 
+        # handle two digits score
         if self.score_left > 9:
             self.screen.blit(self.sprite_num[1], ((x_left - half_width) - half_width * 2, top))
             self.screen.blit(self.sprite_num[self.score_left - 10], ((x_left - half_width) + half_width * 2, top))
@@ -427,6 +455,7 @@ class Pong:
     def draw_menu(self):
         padding = (16, 8)
         adjust = (2, 1, 0, 0)
+
         if self.state == self.STATE_PAUSE_MENU:
             str1 = 'CONTINUE'
             str2 = 'BACK TO MAIN MENU'
@@ -439,8 +468,10 @@ class Pong:
             str1 = 'PLAY'
             str2 = 'EXIT'
             str3 = 'PONG'
+
         str1_size = self.font.size(str1) + padding
         str2_size = self.font.size(str2) + padding
+
         pos1 = (int(self.DISPLAY_WIDTH / 2 - str1_size[0] / 2),
                 int(self.DISPLAY_HEIGHT / 2 - str1_size[1] / 2),
                 str1_size[0],
@@ -449,6 +480,7 @@ class Pong:
                 int((self.DISPLAY_HEIGHT / 2 - str2_size[1] / 2) + str2_size[1] * 1.5),
                 str2_size[0],
                 str2_size[1])
+
         if self.menu_op == 0:
             str1_r = self.font.render(str1, False, self.BLACK)
             str2_r = self.font.render(str2, False, self.WHITE)
@@ -457,10 +489,13 @@ class Pong:
             str1_r = self.font.render(str1, False, self.WHITE)
             str2_r = self.font.render(str2, False, self.BLACK)
             pygame.draw.rect(self.screen, self.WHITE, pos2)
+
         pos1 = tuple(map(operator.add, pos1, adjust))
         pos2 = tuple(map(operator.add, pos2, adjust))
+
         title = self.font_title.render(str3, False, self.WHITE)
         title_w = title.get_width()
+
         self.screen.blit(title, (int(self.DISPLAY_WIDTH / 2 - title_w / 2), 96))
         self.screen.blit(str1_r, pos1)
         self.screen.blit(str2_r, pos2)
@@ -468,11 +503,14 @@ class Pong:
     def draw_end_game(self):
         str1 = 'END GAME'
         str2 = 'WINNER: ' + ('LEFT PLAYER' if self.score_left >= 11 else 'RIGHT PLAYER')
-        str3 = 'ESC TO CONTINUE'
+        str3 = 'ENTER TO CONTINUE'
+
         text1 = self.font_mid.render(str1, False, self.WHITE)
         text2 = self.font.render(str2, False, self.WHITE)
         text3 = self.font.render(str3, False, self.WHITE)
+
         pad_top = self.DISPLAY_HEIGHT * 0.16
+
         self.screen.blit(text1, (int(self.DISPLAY_WIDTH / 2 - text1.get_width() / 2), pad_top))
         self.screen.blit(text2, (int(self.DISPLAY_WIDTH / 2 - text2.get_width() / 2), pad_top + (text1.get_height() * 2)))
         self.screen.blit(text3, (int(self.DISPLAY_WIDTH / 2 - text3.get_width() / 2), pad_top + (text1.get_height() * 5)))
