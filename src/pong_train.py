@@ -69,17 +69,29 @@ class Racket(Entity):
 
         # checks
         self.moved = False
+        self.moved_last_col = False
         self.win = False
 
     def update(self, delta):
         self.moved = False
 
-        if self.up and not self.up_collision():
+        if self.up and not self.up_collision() and not self.out_limit():
             self.moved = True
+            self.moved_last_col = True
             self.y -= self.speed * delta
-        elif self.down and not self.down_collision():
+        elif self.down and not self.down_collision() and not self.out_limit():
             self.moved = True
+            self.moved_last_col = True
             self.y += self.speed * delta
+
+    def super_update(self):
+        self.set_y(self.ball.get_y())
+
+    def out_limit(self):
+        if self.left:
+            return self.ball.get_y() < 50
+        else:
+            return self.ball.get_y() > self.parent.DISPLAY_WIDTH - 50
 
 
 class Ball(Entity):
@@ -109,8 +121,10 @@ class Ball(Entity):
             self.racket_left.dead = True
             if self.get_x() > self.parent.DISPLAY_WIDTH:
                 self.racket_left.win = True
+                self.racket_right.moved_last_col = False
             else:
                 self.racket_right.win = True
+                self.racket_left.moved_last_col = False
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
@@ -275,8 +289,8 @@ class PongTrain:
                 cur_right = self.right_rackets[i]
                 cur_ball = self.balls[i]
 
-                output_left = nets[i].activate((cur_left.y, cur_left.left, cur_ball.x, cur_ball.y, cur_ball.x_speed, cur_ball.y_speed))
-                output_right = nets[i].activate((cur_right.y, cur_left.left, cur_ball.x, cur_ball.y, cur_ball.x_speed, cur_ball.y_speed))
+                output_left = nets[i].activate((cur_left.get_y(), cur_left.left, cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
+                # output_right = nets[i].activate((cur_right.get_y(), cur_right.left, cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
 
                 # left player
                 if output_left[0] > 0.66:
@@ -290,29 +304,39 @@ class PongTrain:
                     cur_left.down = True
 
                 # right player
-                if output_right[0] > 0.66:
-                    cur_right.up = True
-                    cur_right.down = False
-                if 0.66 > output_right[0] > 0.33:
-                    cur_right.up = False
-                    cur_right.down = False
-                if output_right[0] < 0.33:
-                    cur_right.up = False
-                    cur_right.down = True
+                # if output_right[0] > 0.66:
+                #     cur_right.up = True
+                #     cur_right.down = False
+                # if 0.66 > output_right[0] > 0.33:
+                #     cur_right.up = False
+                #     cur_right.down = False
+                # if output_right[0] < 0.33:
+                #     cur_right.up = False
+                #     cur_right.down = True
 
                 cur_left.update(self.delta)
-                cur_right.update(self.delta)
+                cur_right.super_update()
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    genes[i].fitness += 6
-                if cur_left.moved or cur_right.moved:
-                    genes[i].fitness += 1
+                    genes[i].fitness += 10
+                    if cur_left.moved_last_col:# or cur_right.moved_last_col:
+                        genes[i].fitness += 1
+                        cur_left.moved_last_col = False
+                        #cur_right.moved_last_col = False
+
+                # if cur_left.moved or cur_right.moved:
+                #     genes[i].fitness += 1
                 if cur_ball.dead:
-                    max_weight = 20
-                    dist = abs((cur_left.y if cur_left.win else cur_right.y) - cur_ball.y)
+                    max_weight = 25
+                    # dist = abs((cur_left.get_y() if cur_left.win else cur_right.get_y()) - cur_ball.get_y())
+                    dist = abs(cur_left.get_y() - cur_ball.get_y())
                     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100
+                    # print('distance: ',dist)
+                    # print('fit before: ',genes[i].fitness)
                     genes[i].fitness -= genes[i].fitness * fit
+                    # print('fit after: ',genes[i].fitness)
+                    # print('---')
 
             self.delta = self.elapsed / 1000.0
             self.update()
