@@ -7,7 +7,6 @@ import pygame
 import math
 import random
 import time
-import operator
 
 
 class Entity:
@@ -62,15 +61,16 @@ class Racket(Entity):
     up = False
     down = False
 
-    def __init__(self, x, y, width, height, speed, parent, ball, color, left):
+    def __init__(self, x, y, width, height, speed, parent, ball, color):
         Entity.__init__(self, x, y, width, height, speed, parent, color)
         self.ball = ball
-        self.left = left
+
+        # pad
+        self.super_pad = 0
 
         # checks
         self.moved = False
         self.moved_last_col = False
-        self.win = False
 
     def update(self, delta):
         self.moved = False
@@ -85,13 +85,18 @@ class Racket(Entity):
             self.y += self.speed * delta
 
     def super_update(self):
-        self.set_y(self.ball.get_y())
+        if self.ball.x_speed > 0:
+            if (self.ball.x + self.ball.width) >= self.x:
+                num = random.randint(0, self.height / 2)
+                self.super_pad = num if random.randint(0, 1) == 0 else num * -1
+            self.set_y(self.ball.get_y() - self.super_pad)
+        else:
+            self.set_y(self.parent.DISPLAY_HEIGHT / 2)
+
+
 
     def out_limit(self):
-        if self.left:
-            return self.ball.get_y() < 50
-        else:
-            return self.ball.get_y() > self.parent.DISPLAY_WIDTH - 50
+        return self.ball.get_y() < 50
 
 
 class Ball(Entity):
@@ -120,10 +125,8 @@ class Ball(Entity):
             self.racket_right.dead = True
             self.racket_left.dead = True
             if self.get_x() > self.parent.DISPLAY_WIDTH:
-                self.racket_left.win = True
                 self.racket_right.moved_last_col = False
             else:
-                self.racket_right.win = True
                 self.racket_left.moved_last_col = False
 
     def collision(self):
@@ -138,7 +141,6 @@ class Ball(Entity):
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
         elif ball_rect.colliderect(racket_right_rect):
-            self.col = True
             racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
             self.find_angle(1, racket_y, racket_height)
@@ -265,8 +267,8 @@ class PongTrain:
             genes.append(genome)
 
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-            racket_left = Racket(50, mid, 16, 64, speed, self, None, color, True)
-            racket_right = Racket(750, mid, 16, 64, speed, self, None, color, False)
+            racket_left = Racket(50, mid, 16, 64, speed, self, None, color)
+            racket_right = Racket(750, mid, 16, 64, speed, self, None, color)
             ball = Ball(400, mid, 16, 16, 600, self, racket_left, racket_right, color)
             racket_left.ball = ball
             racket_right.ball = ball
@@ -278,7 +280,6 @@ class PongTrain:
 
         for i in range(len(self.balls)):
             self.right_rackets[i].set_y(self.DISPLAY_HEIGHT / 2)
-            self.left_rackets[i].set_y(self.DISPLAY_HEIGHT / 2)
             self.balls[i].generate()
 
         # main loop
@@ -289,49 +290,33 @@ class PongTrain:
                 cur_right = self.right_rackets[i]
                 cur_ball = self.balls[i]
 
-                output_left = nets[i].activate((cur_left.get_y(), cur_left.left, cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
-                # output_right = nets[i].activate((cur_right.get_y(), cur_right.left, cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
+                output = nets[i].activate((cur_left.get_y(), cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
 
-                # left player
-                if output_left[0] > 0.66:
+                if output[0] > 0.66:
                     cur_left.up = True
                     cur_left.down = False
-                if 0.66 > output_left[0] > 0.33:
+                if 0.66 > output[0] > 0.33:
                     cur_left.up = False
                     cur_left.down = False
-                if output_left[0] < 0.33:
+                if output[0] < 0.33:
                     cur_left.up = False
                     cur_left.down = True
-
-                # right player
-                # if output_right[0] > 0.66:
-                #     cur_right.up = True
-                #     cur_right.down = False
-                # if 0.66 > output_right[0] > 0.33:
-                #     cur_right.up = False
-                #     cur_right.down = False
-                # if output_right[0] < 0.33:
-                #     cur_right.up = False
-                #     cur_right.down = True
 
                 cur_left.update(self.delta)
                 cur_right.super_update()
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    genes[i].fitness += 10
-                    if cur_left.moved_last_col:# or cur_right.moved_last_col:
-                        genes[i].fitness += 1
+                    genes[i].fitness += 20.0
+                    if not cur_left.moved_last_col:
+                        genes[i].fitness -= 5.0
                         cur_left.moved_last_col = False
-                        #cur_right.moved_last_col = False
-
-                # if cur_left.moved or cur_right.moved:
-                #     genes[i].fitness += 1
+                    if cur_left.up_collision() or cur_left.down_collision():
+                        genes[i].fitness -= 10.0
                 if cur_ball.dead:
-                    max_weight = 25
-                    # dist = abs((cur_left.get_y() if cur_left.win else cur_right.get_y()) - cur_ball.get_y())
+                    max_weight = 25.0
                     dist = abs(cur_left.get_y() - cur_ball.get_y())
-                    fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100
+                    fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
                     # print('distance: ',dist)
                     # print('fit before: ',genes[i].fitness)
                     genes[i].fitness -= genes[i].fitness * fit

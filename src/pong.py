@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+import pickle
 
+import neat
 import pygame
 import math
 import random
@@ -67,11 +70,11 @@ class Racket(Entity):
         elif self.down and not self.down_collision():
             self.y += self.speed * delta
 
-    def update_ia(self, delta):
+    def update_machine(self, delta, player):
         ball = self.parent.ball
 
         # if the ball is coming to racket's' direction, it follow the ball
-        if ball.x_speed < 0:
+        if (ball.x_speed < 0 and player == self.parent.PLAYER_LEFT) or (ball.x_speed > 0 and player == self.parent.PLAYER_RIGHT):
             if ball.get_y() < self.get_y() - ball.height and not self.up_collision():
                 self.y -= self.speed * delta
             elif ball.get_y() > self.get_y() + ball.height and not self.down_collision():
@@ -198,15 +201,17 @@ class Pong:
     PLAYER_RIGHT = 1
     NO_PLAYER = 2
 
-    PLAYER_VS_PLAYER = True
-    PLAYER_VS_MACHINE = False
+    PLAYER_VS_PLAYER = 0
+    PLAYER_VS_MACHINE = 1
+    PLAYER_VS_IA = 2
+    IA_VS_MACHINE = 3
 
     STATE_PLAYING = 0
     STATE_MAIN_MENU = 1
     STATE_PAUSE_MENU = 2
-    STATE_SEL_MENU = 3
-    STATE_END_GAME = 4
-    STATE_WAIT = 5
+    STATE_SEL_MODE_MENU = 3
+    STATE_END_GAME = 5
+    STATE_WAIT = 6
 
     def __init__(self):
         pygame.init()
@@ -249,11 +254,13 @@ class Pong:
         # control
         self.running = False
         self.effects = True
-        self.mode = False
+        self.mode = 0
         self.state = self.STATE_MAIN_MENU
         self.player_ball = self.NO_PLAYER
         # self.state = self.STATE_END_GAME
+        self.ia = self.load_ia()
         self.menu_op = 0
+        self.sound = True
         self.score_left = 0
         self.score_right = 0
         self.clock = pygame.time.Clock()
@@ -272,6 +279,14 @@ class Pong:
             self.elapsed = self.clock.tick(60)
 
         pygame.quit()
+
+    @staticmethod
+    def load_ia():
+        local_dir = os.path.dirname(__file__)
+        config_path = os.path.join(local_dir, 'config-feedforward.txt')
+        with open('winner.pkl', "rb") as f:
+            genome = pickle.load(f)
+        return neat.nn.FeedForwardNetwork.create(genome, neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path))
 
     @staticmethod
     def sprite_load_scaled(path, scale):
@@ -305,7 +320,7 @@ class Pong:
 
         if self.state == self.STATE_PLAYING:
             self.update_playing()
-        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MENU:
+        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MODE_MENU:
             self.update_menus()
         elif self.state == self.STATE_END_GAME:
             self.update_end_game()
@@ -348,47 +363,102 @@ class Pong:
             self.state = self.STATE_PAUSE_MENU
 
         if self.mode == self.PLAYER_VS_PLAYER:
+            # player left (HUMAN)
             self.racket_left.up = self.k_w
             self.racket_left.down = self.k_s
             self.racket_left.update(self.delta)
-        else:
-            self.racket_left.update_ia(self.delta)
+            # player right (HUMAN)
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
+            self.racket_right.update(self.delta)
+        elif self.mode == self.PLAYER_VS_MACHINE:
+            # player left (MACHINE)
+            self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
+            # player right (HUMAN)
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
+            self.racket_right.update(self.delta)
+        elif self.mode == self.PLAYER_VS_IA:
+            # player left (IA)
+            self.update_ia()
+            # player right (HUMAN)
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
+            self.racket_right.update(self.delta)
+        elif self.mode == self.IA_VS_MACHINE:
+            # player left (IA)
+            self.update_ia()
+            # player right (MACHINE)
+            self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
 
-        self.racket_right.up = self.k_up
-        self.racket_right.down = self.k_down
-        self.racket_right.update(self.delta)
         self.ball.update(self.delta)
 
         if self.score_right >= 11 or self.score_left >= 11:
             self.state = self.STATE_END_GAME
 
+    def update_ia(self):
+        output = self.ia.activate((self.racket_left.get_y(), self.ball.get_x(), self.ball.get_y(), self.ball.x_speed, self.ball.y_speed))
+
+        if output[0] > 0.66:
+            self.racket_left.up = True
+            self.racket_left.down = False
+        if 0.66 > output[0] > 0.33:
+            self.racket_left.up = False
+            self.racket_left.down = False
+        if output[0] < 0.33:
+            self.racket_left.up = False
+            self.racket_left.down = True
+
+        self.racket_left.update(self.delta)
+
     def update_menus(self):
-        if self.k_up or self.k_w:
-            self.menu_op = 0
-        elif self.k_down or self.k_s:
-            self.menu_op = 1
+        op_size = 3
+        if self.state == self.STATE_SEL_MODE_MENU:
+            op_size = 5
+
+        if (self.k_up or self.k_w) and 0 <= self.menu_op - 1 < op_size:
+            self.menu_op -= 1
+            self.k_up = False
+            self.k_w = False
+        elif (self.k_down or self.k_s) and 0 <= self.menu_op + 1 < op_size:
+            self.menu_op += 1
+            self.k_down = False
+            self.k_s = False
 
         if self.k_enter:
-            if self.menu_op == 0:
-                if self.state == self.STATE_MAIN_MENU:
-                    self.state = self.STATE_SEL_MENU
-                elif self.state == self.STATE_PAUSE_MENU:
-                    self.state = self.STATE_PLAYING
-                elif self.state == self.STATE_SEL_MENU:
-                    self.state = self.STATE_PLAYING
-                    self.restart()
-                    self.mode = self.PLAYER_VS_PLAYER
-            else:
-                if self.state == self.STATE_MAIN_MENU:
-                    self.running = False
-                elif self.state == self.STATE_SEL_MENU:
-                    self.state = self.STATE_PLAYING
-                    self.restart()
-                    self.mode = self.PLAYER_VS_MACHINE
-                else:
-                    self.state = self.STATE_MAIN_MENU
-                self.menu_op = 0
             self.k_enter = False
+            option = self.menu_op
+            self.menu_op = 0
+            if self.state == self.STATE_MAIN_MENU:
+                if option == 0:
+                    self.state = self.STATE_SEL_MODE_MENU
+                elif option == 1:
+                    self.sound = not self.sound
+                    self.menu_op = 1
+                elif option == 2:
+                    self.running = False
+                    self.menu_op = 2
+            elif self.state == self.STATE_PAUSE_MENU:
+                if option == 0:
+                    self.state = self.STATE_PLAYING
+                elif option == 1:
+                    self.sound = not self.sound
+                    self.menu_op = 1
+                elif option == 2:
+                    self.state = self.STATE_MAIN_MENU
+            elif self.state == self.STATE_SEL_MODE_MENU:
+                self.state = self.STATE_PLAYING
+                self.restart()
+                if option == 0:
+                    self.mode = self.PLAYER_VS_PLAYER
+                elif option == 1:
+                    self.mode = self.PLAYER_VS_MACHINE
+                elif option == 2:
+                    self.mode = self.PLAYER_VS_IA
+                elif option == 3:
+                    self.mode = self.IA_VS_MACHINE
+                elif option == 4:
+                    self.state = self.STATE_MAIN_MENU
 
     def update_end_game(self):
         if self.k_enter:
@@ -409,7 +479,7 @@ class Pong:
             self.draw_net()
             self.draw_racket()
             self.draw_ball()
-        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MENU:
+        elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MODE_MENU:
             self.draw_menu()
         elif self.state == self.STATE_END_GAME:
             self.draw_end_game()
@@ -456,49 +526,53 @@ class Pong:
         padding = (16, 8)
         adjust = (2, 1, 0, 0)
 
+        str_title = ''
+        options_str = []
+
         if self.state == self.STATE_PAUSE_MENU:
-            str1 = 'CONTINUE'
-            str2 = 'BACK TO MAIN MENU'
-            str3 = 'PAUSED'
-        elif self.state == self.STATE_SEL_MENU:
-            str1 = 'PLAYER VS. PLAYER'
-            str2 = 'PLAYER VS. MACHINE'
-            str3 = 'MODE'
-        else:
-            str1 = 'PLAY'
-            str2 = 'EXIT'
-            str3 = 'PONG'
+            str_title = 'PAUSED'
+            options_str.append('CONTINUE')
+            options_str.append('SOUND: ' + str(self.sound))
+            options_str.append('BACK TO MAIN MENU')
+        elif self.state == self.STATE_SEL_MODE_MENU:
+            str_title = 'SEL. A MODE'
+            options_str.append('PLAYER VS. PLAYER')
+            options_str.append('PLAYER VS. MACHINE')
+            options_str.append('PLAYER VS. IA')
+            options_str.append('IA VS. MACHINE')
+            options_str.append('BACK')
+        elif self.state == self.STATE_MAIN_MENU:
+            str_title = 'PONG'
+            options_str.append('PLAY')
+            options_str.append('SOUND: ' + str(self.sound))
+            options_str.append('EXIT')
 
-        str1_size = self.font.size(str1) + padding
-        str2_size = self.font.size(str2) + padding
+        str_size = []
+        pos = []
+        pos_f = []
+        str_rend = []
+        op_pad = 0
 
-        pos1 = (int(self.DISPLAY_WIDTH / 2 - str1_size[0] / 2),
-                int(self.DISPLAY_HEIGHT / 2 - str1_size[1] / 2),
-                str1_size[0],
-                str1_size[1])
-        pos2 = (int(self.DISPLAY_WIDTH / 2 - str2_size[0] / 2),
-                int((self.DISPLAY_HEIGHT / 2 - str2_size[1] / 2) + str2_size[1] * 1.5),
-                str2_size[0],
-                str2_size[1])
+        for i, op_str in enumerate(options_str):
+            str_s = self.font.size(op_str) + padding
+            str_size.append(str_s)
+            pos.append((int(self.DISPLAY_WIDTH / 2 - str_s[0] / 2),
+                        int(((self.DISPLAY_HEIGHT / 4) * 1.5 - str_s[1] / 2) + str_s[1] * op_pad),
+                        str_s[0],
+                        str_s[1]))
+            op_pad += 1.5
+            if i == self.menu_op:
+                str_rend.append(self.font.render(options_str[i], False, self.BLACK))
+                pygame.draw.rect(self.screen, self.WHITE, pos[i])
+            else:
+                str_rend.append(self.font.render(options_str[i], False, self.WHITE))
 
-        if self.menu_op == 0:
-            str1_r = self.font.render(str1, False, self.BLACK)
-            str2_r = self.font.render(str2, False, self.WHITE)
-            pygame.draw.rect(self.screen, self.WHITE, pos1)
-        else:
-            str1_r = self.font.render(str1, False, self.WHITE)
-            str2_r = self.font.render(str2, False, self.BLACK)
-            pygame.draw.rect(self.screen, self.WHITE, pos2)
+            pos_f.append(tuple(map(operator.add, pos[i], adjust)))
+            self.screen.blit(str_rend[i], pos_f[i])
 
-        pos1 = tuple(map(operator.add, pos1, adjust))
-        pos2 = tuple(map(operator.add, pos2, adjust))
-
-        title = self.font_title.render(str3, False, self.WHITE)
+        title = self.font_title.render(str_title, False, self.WHITE)
         title_w = title.get_width()
-
-        self.screen.blit(title, (int(self.DISPLAY_WIDTH / 2 - title_w / 2), 96))
-        self.screen.blit(str1_r, pos1)
-        self.screen.blit(str2_r, pos2)
+        self.screen.blit(title, (int(self.DISPLAY_WIDTH / 2 - title_w / 2), 60))
 
     def draw_end_game(self):
         str1 = 'END GAME'
