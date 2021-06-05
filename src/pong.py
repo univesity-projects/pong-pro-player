@@ -105,11 +105,11 @@ class Ball(Entity):
 
         # check is some player did a score
         if self.get_x() > self.parent.DISPLAY_WIDTH:
-            self.parent.snd_lose.play()
+            self.parent.play(self.parent.SND_LOSE)
             self.parent.score_up(self.parent.PLAYER_LEFT)
             self.slaps = 0
         elif self.get_x() < 0:
-            self.parent.snd_lose.play()
+            self.parent.play(self.parent.SND_LOSE)
             self.parent.score_up(self.parent.PLAYER_RIGHT)
             self.slaps = 0
 
@@ -120,18 +120,18 @@ class Ball(Entity):
 
         # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
-            self.parent.snd_racket_collision.play()
+            self.parent.play(self.parent.SND_RACKET_COLLISION)
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
         elif ball_rect.colliderect(racket_right_rect):
-            self.parent.snd_racket_collision.play()
+            self.parent.play(self.parent.SND_RACKET_COLLISION)
             racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
             self.find_angle(1, racket_y, racket_height)
 
         if self.up_collision() or self.down_collision():
-            self.parent.snd_wall_collision.play()
+            self.parent.play(self.parent.SND_WALL_COLLISION)
             self.y_speed *= -1
 
     def find_angle(self, index, racket_y, racket_height):
@@ -188,6 +188,9 @@ class Ball(Entity):
 
     def set_angle(self, angle_in_radians):
         speed = self.speed + (50 * self.slaps)
+        if speed > 1200:
+            speed = 1200
+        # print(speed)
         self.x_speed = speed * math.cos(angle_in_radians)
         self.y_speed = speed * math.sin(angle_in_radians)
 
@@ -206,11 +209,15 @@ class Pong:
     PLAYER_RIGHT = 1
     NO_PLAYER = 2
 
-    PLAYER_VS_PLAYER = 0
-    PLAYER_VS_MACHINE = 1
-    PLAYER_VS_IA = 2
-    IA_VS_MACHINE = 3
-    MACHINE_VS_MACHINE = 4
+    MODE_PLAYER_VS_PLAYER = 0
+    MODE_PLAYER_VS_MACHINE = 1
+    MODE_PLAYER_VS_IA = 2
+    MODE_IA_VS_MACHINE = 3
+    MODE_MACHINE_VS_MACHINE = 4
+
+    SND_LOSE = 0
+    SND_RACKET_COLLISION = 1
+    SND_WALL_COLLISION = 2
 
     STATE_PLAYING = 0
     STATE_MAIN_MENU = 1
@@ -266,7 +273,7 @@ class Pong:
         self.running = False
         self.effects = True
         self.sound = False
-        self.mode = self.MACHINE_VS_MACHINE
+        self.mode = self.MODE_MACHINE_VS_MACHINE
         self.state = self.STATE_MAIN_MENU
         self.player_ball = self.NO_PLAYER
         # self.state = self.STATE_END_GAME
@@ -284,18 +291,27 @@ class Pong:
 
         # main loop
         while self.running:
+            self.elapsed = self.clock.tick(60)
             self.delta = self.elapsed / 1000.0
             self.update()
             self.render()
-            self.elapsed = self.clock.tick(60)
 
         pygame.quit()
+
+    def play(self, sound):
+        if self.sound:
+            if sound == self.SND_LOSE:
+                self.snd_lose.play()
+            elif sound == self.SND_RACKET_COLLISION:
+                self.snd_racket_collision.play()
+            elif sound == self.SND_WALL_COLLISION:
+                self.snd_wall_collision.play()
 
     @staticmethod
     def load_ia():
         local_dir = os.path.dirname(__file__)
         config_path = os.path.join(local_dir, 'config-feedforward.txt')
-        with open('ia.pkl', "rb") as f:
+        with open('s25,nm-5,e-15__af(relu),mr25__winner.pkl', "rb") as f:
             genome = pickle.load(f)
         return neat.nn.FeedForwardNetwork.create(genome, neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path))
 
@@ -373,27 +389,27 @@ class Pong:
         if self.k_esc:
             self.state = self.STATE_PAUSE_MENU
 
-        if self.mode == self.PLAYER_VS_PLAYER:
+        if self.mode == self.MODE_PLAYER_VS_PLAYER:
             # player left (HUMAN)
             self.update_left()
             # player right (HUMAN)
             self.update_right()
-        elif self.mode == self.PLAYER_VS_MACHINE:
+        elif self.mode == self.MODE_PLAYER_VS_MACHINE:
             # player left (MACHINE)
             self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
             # player right (HUMAN)
             self.update_right()
-        elif self.mode == self.PLAYER_VS_IA:
+        elif self.mode == self.MODE_PLAYER_VS_IA:
             # player left (IA)
             self.update_ia()
             # player right (HUMAN)
             self.update_left()
-        elif self.mode == self.IA_VS_MACHINE:
+        elif self.mode == self.MODE_IA_VS_MACHINE:
             # player left (IA)
             self.update_ia()
             # player right (MACHINE)
             self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
-        elif self.mode == self.MACHINE_VS_MACHINE:
+        elif self.mode == self.MODE_MACHINE_VS_MACHINE:
             # player left (MACHINE)
             self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
             # player right (MACHINE)
@@ -470,17 +486,17 @@ class Pong:
                 self.state = self.STATE_PLAYING
                 self.restart()
                 if option == 0:
-                    self.mode = self.PLAYER_VS_PLAYER
+                    self.mode = self.MODE_PLAYER_VS_PLAYER
                 elif option == 1:
-                    self.mode = self.PLAYER_VS_MACHINE
+                    self.mode = self.MODE_PLAYER_VS_MACHINE
                 elif option == 2:
-                    self.mode = self.PLAYER_VS_IA
+                    self.mode = self.MODE_PLAYER_VS_IA
                 elif option == 3:
-                    self.mode = self.IA_VS_MACHINE
+                    self.mode = self.MODE_IA_VS_MACHINE
                 elif option == 4:
                     self.state = self.STATE_MAIN_MENU
                 elif option == 5:
-                    self.mode = self.MACHINE_VS_MACHINE
+                    self.mode = self.MODE_MACHINE_VS_MACHINE
 
     def update_end_game(self):
         if self.k_enter:

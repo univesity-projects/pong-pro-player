@@ -81,25 +81,15 @@ class Racket(Entity):
             self.moved_last_col = True
             self.y += self.speed * delta
 
-    def super_update(self):
-        if self.ball.x_speed > 0:
-            if (self.ball.x + self.ball.width) >= self.x:
-                num = self.height / 2 - self.ball.height / 2
-                self.super_pad = random.randint(int(-num), num)
-            self.set_y(self.ball.get_y() + self.super_pad)
-        else:
-            self.set_y(self.parent.DISPLAY_HEIGHT / 2)
-
     def out_limit(self):
         return self.ball.get_y() < 50
 
 
 class Ball(Entity):
 
-    def __init__(self, x, y, width, height, speed, parent, racket_left, racket_right, color):
+    def __init__(self, x, y, width, height, speed, parent, racket_left, color):
         Entity.__init__(self, x, y, width, height, speed, parent, color)
         self.racket_left = racket_left
-        self.racket_right = racket_right
         self.x_speed = 0
         self.y_speed = 0
         self.slaps = 0
@@ -115,22 +105,16 @@ class Ball(Entity):
 
         self.collision()
 
-        if (self.get_x() > self.parent.DISPLAY_WIDTH or self.get_x() < 0) and not self.dead:
+        if self.get_x() < 0:
             self.dead = True
-            self.racket_right.dead = True
             self.racket_left.dead = True
-            if self.get_x() < 0:
-                pass
-            else:
-                print('morreu errado')
-                print('ball y: ', self.get_y())
-                print('rack y: ', self.racket_right.get_y())
-                print('---')
+            if self.get_x() > self.parent.DISPLAY_WIDTH:
+                print('RIGHT DEATH')
+                sys.exit()
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
         racket_left_rect = pygame.rect.Rect((self.racket_left.x, self.racket_left.y, self.racket_left.width, self.racket_left.height))
-        racket_right_rect = pygame.rect.Rect((self.racket_right.x, self.racket_right.y, self.racket_right.width, self.racket_right.height))
 
         # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
@@ -139,9 +123,10 @@ class Ball(Entity):
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
-        elif ball_rect.colliderect(racket_right_rect):
-            racket_y = self.racket_right.get_y()
-            racket_height = self.racket_right.height
+        elif self.get_x() >= self.parent.DISPLAY_WIDTH - 50:
+            num = self.racket_left.height / 2 - 1
+            racket_y = self.get_y() + random.randint(int(-num), num)
+            racket_height = self.racket_left.height
             self.find_angle(1, racket_y, racket_height)
 
         if self.up_collision() or self.down_collision():
@@ -178,29 +163,21 @@ class Ball(Entity):
         self.slaps += 1
 
     def generate(self):
-        player = self.parent.player_ball
-
         self.set_x(self.parent.DISPLAY_WIDTH / 2)
         self.set_y(random.randint(self.height, self.parent.DISPLAY_HEIGHT - self.height))
 
-        if player != self.parent.NO_PLAYER:
-            if player == self.parent.PLAYER_LEFT:
-                angle = random.randint(120, 180)
-                angle = angle * -1 if random.randint(0, 1) == 0 else angle
-                self.set_angle(math.radians(angle))
-            else:
-                self.set_angle(math.radians(random.randint(-60, 60)))
-        else:
-            num = random.randint(0, 3)
-            if num == 0 or num == 2:
-                self.set_angle(math.radians(random.randint(-60, 60)))
-            elif num == 1:
-                self.set_angle(math.radians(random.randint(120, 180)))
-            elif num == 3:
-                self.set_angle(math.radians(random.randint(-180, -120)))
+        num = random.randint(0, 3)
+        if num == 0 or num == 2:
+            self.set_angle(math.radians(random.randint(-60, 60)))
+        elif num == 1:
+            self.set_angle(math.radians(random.randint(120, 180)))
+        elif num == 3:
+            self.set_angle(math.radians(random.randint(-180, -120)))
 
     def set_angle(self, angle_in_radians):
         speed = self.speed + (50 * self.slaps)
+        if speed > 1200:
+            speed = 1200
         self.x_speed = speed * math.cos(angle_in_radians)
         self.y_speed = speed * math.sin(angle_in_radians)
 
@@ -208,16 +185,11 @@ class Ball(Entity):
 class PongTrain:
     # constants
     BLACK = (0, 0, 0)
-    DARK_GRAY = (25, 25, 25)
     WHITE = (255, 255, 255)
 
     SCALE = 8
     DISPLAY_WIDTH = 800
     DISPLAY_HEIGHT = 600
-
-    PLAYER_LEFT = 0
-    PLAYER_RIGHT = 1
-    NO_PLAYER = 2
 
     def __init__(self):
         pygame.init()
@@ -243,18 +215,19 @@ class PongTrain:
 
         # objects
         self.left_rackets = []
-        self.right_rackets = []
         self.balls = []
 
         # control
         self.running = True
         self.mode = False
-        self.player_ball = self.NO_PLAYER
         self.clock = pygame.time.Clock()
         self.delta = 0
         self.elapsed = 0
 
     def run(self, genomes, config):
+        self.clock = pygame.time.Clock()
+        self.delta = 0
+        self.elapsed = 0
         self.gen += 1
 
         nets = []
@@ -270,20 +243,19 @@ class PongTrain:
 
             color = (random.randint(55, 255), random.randint(55, 255), random.randint(55, 255))
             racket_left = Racket(50, mid, 16, 64, speed, self, None, color)
-            racket_right = Racket(750, mid, 16, 64, speed, self, None, color)
-            ball = Ball(400, mid, 16, 16, 600, self, racket_left, racket_right, color)
+            ball = Ball(400, mid, 16, 16, 600, self, racket_left, color)
             racket_left.ball = ball
-            racket_right.ball = ball
             ball.generate()
             self.left_rackets.append(racket_left)
-            self.right_rackets.append(racket_right)
             self.balls.append(ball)
 
         # main loop
         while len(self.balls) > 0:
+            self.elapsed = self.clock.tick(60)
+            self.delta = self.elapsed / 1000.0
+
             for i in range(len(self.balls)):
                 cur_left = self.left_rackets[i]
-                cur_right = self.right_rackets[i]
                 cur_ball = self.balls[i]
 
                 output = nets[i].activate((cur_left.get_y(), cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
@@ -300,15 +272,16 @@ class PongTrain:
 
                 cur_left.update(self.delta)
                 cur_ball.update(self.delta)
-                cur_right.super_update()
 
+                # if cur_ball.col:
+                #     genes[i].fitness += 10.0
                 if cur_ball.col:
                     genes[i].fitness += 25.0
                     if not cur_left.moved_last_col:
-                        genes[i].fitness -= 5.0
+                        genes[i].fitness -= 2.5
                         cur_left.moved_last_col = False
                     if cur_left.up_collision() or cur_left.down_collision():
-                        genes[i].fitness -= 10.0
+                        genes[i].fitness -= 5.0
                 if cur_ball.dead:
                     max_weight = 5.0
                     dist = abs(cur_left.get_y() - cur_ball.get_y())
@@ -319,10 +292,8 @@ class PongTrain:
                     # print('fit after: ',genes[i].fitness)
                     # print('---')
 
-            self.delta = self.elapsed / 1000.0
             self.update()
             self.render()
-            self.elapsed = self.clock.tick(60)
 
             # remove ended games
             # self.balls = [value for value in self.balls if not value.dead]
@@ -332,7 +303,6 @@ class PongTrain:
                 if ball.dead:
                     self.balls.pop(i)
                     self.left_rackets.pop(i)
-                    self.right_rackets.pop(i)
                     nets.pop(i)
                     genes.pop(i)
 
@@ -377,7 +347,6 @@ class PongTrain:
 
         for i in range(len(self.left_rackets)):
             self.left_rackets[i].render()
-            self.right_rackets[i].render()
             self.balls[i].render()
 
         self.draw_data()
