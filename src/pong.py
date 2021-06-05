@@ -105,11 +105,13 @@ class Ball(Entity):
 
         # check is some player did a score
         if self.get_x() > self.parent.DISPLAY_WIDTH:
+            self.parent.snd_lose.play()
             self.parent.score_up(self.parent.PLAYER_LEFT)
             self.slaps = 0
         elif self.get_x() < 0:
-            self.slaps = 0
+            self.parent.snd_lose.play()
             self.parent.score_up(self.parent.PLAYER_RIGHT)
+            self.slaps = 0
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
@@ -118,15 +120,18 @@ class Ball(Entity):
 
         # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
+            self.parent.snd_racket_collision.play()
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
         elif ball_rect.colliderect(racket_right_rect):
+            self.parent.snd_racket_collision.play()
             racket_y = self.racket_right.get_y()
             racket_height = self.racket_right.height
             self.find_angle(1, racket_y, racket_height)
 
         if self.up_collision() or self.down_collision():
+            self.parent.snd_wall_collision.play()
             self.y_speed *= -1
 
     def find_angle(self, index, racket_y, racket_height):
@@ -205,6 +210,7 @@ class Pong:
     PLAYER_VS_MACHINE = 1
     PLAYER_VS_IA = 2
     IA_VS_MACHINE = 3
+    MACHINE_VS_MACHINE = 4
 
     STATE_PLAYING = 0
     STATE_MAIN_MENU = 1
@@ -228,6 +234,11 @@ class Pong:
         self.k_s = False
         self.k_enter = False
         self.k_esc = False
+
+        # musics
+        self.snd_lose = pygame.mixer.Sound('src/res/sound/lose.ogg')
+        self.snd_racket_collision = pygame.mixer.Sound('src/res/sound/racket_collision.ogg')
+        self.snd_wall_collision = pygame.mixer.Sound('src/res/sound/wall_collision.ogg')
 
         # sprites
         self.clean_color = self.DARK_GRAY
@@ -254,13 +265,13 @@ class Pong:
         # control
         self.running = False
         self.effects = True
-        self.mode = 0
+        self.sound = False
+        self.mode = self.MACHINE_VS_MACHINE
         self.state = self.STATE_MAIN_MENU
         self.player_ball = self.NO_PLAYER
         # self.state = self.STATE_END_GAME
         self.ia = self.load_ia()
         self.menu_op = 0
-        self.sound = True
         self.score_left = 0
         self.score_right = 0
         self.clock = pygame.time.Clock()
@@ -297,11 +308,11 @@ class Pong:
     def restart(self):
         self.score_left = 0
         self.score_right = 0
+        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
+        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
         self.start_match()
 
     def start_match(self):
-        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
-        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
         self.ball.generate()
 
     def score_up(self, player):
@@ -382,6 +393,11 @@ class Pong:
             self.update_ia()
             # player right (MACHINE)
             self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
+        elif self.mode == self.MACHINE_VS_MACHINE:
+            # player left (MACHINE)
+            self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
+            # player right (MACHINE)
+            self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
 
         self.ball.update(self.delta)
 
@@ -401,13 +417,15 @@ class Pong:
     def update_ia(self):
         output = self.ia.activate((self.racket_left.get_y(), self.ball.get_x(), self.ball.get_y(), self.ball.x_speed, self.ball.y_speed))
 
-        if output[0] > 0.66:
+        # print(output)
+
+        if output[0] >= 0.66:
             self.racket_left.up = True
             self.racket_left.down = False
         if 0.66 > output[0] > 0.33:
             self.racket_left.up = False
             self.racket_left.down = False
-        if output[0] < 0.33:
+        if output[0] <= 0.33:
             self.racket_left.up = False
             self.racket_left.down = True
 
@@ -416,7 +434,7 @@ class Pong:
     def update_menus(self):
         op_size = 3
         if self.state == self.STATE_SEL_MODE_MENU:
-            op_size = 5
+            op_size = 6
 
         if (self.k_up or self.k_w) and 0 <= self.menu_op - 1 < op_size:
             self.menu_op -= 1
@@ -461,6 +479,8 @@ class Pong:
                     self.mode = self.IA_VS_MACHINE
                 elif option == 4:
                     self.state = self.STATE_MAIN_MENU
+                elif option == 5:
+                    self.mode = self.MACHINE_VS_MACHINE
 
     def update_end_game(self):
         if self.k_enter:
@@ -468,6 +488,9 @@ class Pong:
             self.k_enter = False
 
     def update_wait(self):
+        if self.k_esc:
+            self.state = self.STATE_PAUSE_MENU
+
         self.timer -= self.delta
         if self.timer <= 0:
             self.state = self.STATE_PLAYING
@@ -543,6 +566,7 @@ class Pong:
             options_str.append('PLAYER VS. IA')
             options_str.append('IA VS. MACHINE')
             options_str.append('BACK')
+            options_str.append('')
         elif self.state == self.STATE_MAIN_MENU:
             str_title = 'PONG'
             options_str.append('PLAY')

@@ -11,9 +11,6 @@ import time
 
 class Entity:
 
-    # set and get functions are simulating an centered object
-    # to get or set the real x and y you've to set or get directly from respective var
-
     def __init__(self, x, y, width, height, speed, parent, color):
         self.x = x - width / 2
         self.y = y - height / 2
@@ -87,13 +84,11 @@ class Racket(Entity):
     def super_update(self):
         if self.ball.x_speed > 0:
             if (self.ball.x + self.ball.width) >= self.x:
-                num = random.randint(0, self.height / 2)
-                self.super_pad = num if random.randint(0, 1) == 0 else num * -1
-            self.set_y(self.ball.get_y() - self.super_pad)
+                num = self.height / 2 - self.ball.height / 2
+                self.super_pad = random.randint(int(-num), num)
+            self.set_y(self.ball.get_y() + self.super_pad)
         else:
             self.set_y(self.parent.DISPLAY_HEIGHT / 2)
-
-
 
     def out_limit(self):
         return self.ball.get_y() < 50
@@ -120,14 +115,17 @@ class Ball(Entity):
 
         self.collision()
 
-        if self.get_x() > self.parent.DISPLAY_WIDTH or self.get_x() < 0:
+        if (self.get_x() > self.parent.DISPLAY_WIDTH or self.get_x() < 0) and not self.dead:
             self.dead = True
             self.racket_right.dead = True
             self.racket_left.dead = True
-            if self.get_x() > self.parent.DISPLAY_WIDTH:
-                self.racket_right.moved_last_col = False
+            if self.get_x() < 0:
+                pass
             else:
-                self.racket_left.moved_last_col = False
+                print('morreu errado')
+                print('ball y: ', self.get_y())
+                print('rack y: ', self.racket_right.get_y())
+                print('---')
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
@@ -136,6 +134,7 @@ class Ball(Entity):
 
         # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
+            self.racket_left.moved_last_col = False
             self.col = True
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
@@ -228,6 +227,8 @@ class PongTrain:
         self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
         random.seed(time.time())
 
+        self.gen = -1
+
         # keys
         self.k_up = False
         self.k_down = False
@@ -244,7 +245,6 @@ class PongTrain:
         self.left_rackets = []
         self.right_rackets = []
         self.balls = []
-        self.gen = 0
 
         # control
         self.running = True
@@ -255,36 +255,32 @@ class PongTrain:
         self.elapsed = 0
 
     def run(self, genomes, config):
+        self.gen += 1
+
         nets = []
         genes = []
 
         speed = 800
-        mid = 300
+        mid = self.DISPLAY_HEIGHT / 2
         for genome_id, genome in genomes:
             genome.fitness = 0
             net = neat.nn.FeedForwardNetwork.create(genome, config)
             nets.append(net)
             genes.append(genome)
 
-            color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            color = (random.randint(55, 255), random.randint(55, 255), random.randint(55, 255))
             racket_left = Racket(50, mid, 16, 64, speed, self, None, color)
             racket_right = Racket(750, mid, 16, 64, speed, self, None, color)
             ball = Ball(400, mid, 16, 16, 600, self, racket_left, racket_right, color)
             racket_left.ball = ball
             racket_right.ball = ball
+            ball.generate()
             self.left_rackets.append(racket_left)
             self.right_rackets.append(racket_right)
             self.balls.append(ball)
 
-        self.gen += 1
-
-        for i in range(len(self.balls)):
-            self.right_rackets[i].set_y(self.DISPLAY_HEIGHT / 2)
-            self.balls[i].generate()
-
         # main loop
         while len(self.balls) > 0:
-
             for i in range(len(self.balls)):
                 cur_left = self.left_rackets[i]
                 cur_right = self.right_rackets[i]
@@ -292,19 +288,19 @@ class PongTrain:
 
                 output = nets[i].activate((cur_left.get_y(), cur_ball.get_x(), cur_ball.get_y(), cur_ball.x_speed, cur_ball.y_speed))
 
-                if output[0] > 0.66:
+                if output[0] >= 0.66:
                     cur_left.up = True
                     cur_left.down = False
                 if 0.66 > output[0] > 0.33:
                     cur_left.up = False
                     cur_left.down = False
-                if output[0] < 0.33:
+                if output[0] <= 0.33:
                     cur_left.up = False
                     cur_left.down = True
 
                 cur_left.update(self.delta)
-                cur_right.super_update()
                 cur_ball.update(self.delta)
+                cur_right.super_update()
 
                 if cur_ball.col:
                     genes[i].fitness += 25.0
@@ -314,8 +310,7 @@ class PongTrain:
                     if cur_left.up_collision() or cur_left.down_collision():
                         genes[i].fitness -= 10.0
                 if cur_ball.dead:
-                    # talvez 20
-                    max_weight = 20.0
+                    max_weight = 5.0
                     dist = abs(cur_left.get_y() - cur_ball.get_y())
                     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
                     # print('distance: ',dist)
@@ -330,9 +325,16 @@ class PongTrain:
             self.elapsed = self.clock.tick(60)
 
             # remove ended games
-            self.balls = [value for value in self.balls if not value.dead]
-            self.left_rackets = [value for value in self.left_rackets if not value.dead]
-            self.right_rackets = [value for value in self.right_rackets if not value.dead]
+            # self.balls = [value for value in self.balls if not value.dead]
+            # self.left_rackets = [value for value in self.left_rackets if not value.dead]
+            # self.right_rackets = [value for value in self.right_rackets if not value.dead]
+            for i, ball in enumerate(self.balls):
+                if ball.dead:
+                    self.balls.pop(i)
+                    self.left_rackets.pop(i)
+                    self.right_rackets.pop(i)
+                    nets.pop(i)
+                    genes.pop(i)
 
     def update(self):
         self.update_events()

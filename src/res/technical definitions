@@ -1,9 +1,0 @@
-REGRA PARA VENCEDOR
-O jogo é disputado numa melhor de sete games, sendo que um game é vencido pelo primeiro jogador a fazer 11 pontos. Caso
-o placar fique empatado em 10 a 10, um dos jogadores deve abrir uma vantagem de dois pontos para que vença o game. Antes
-de o jogo começar, o árbitro se reúne com os jogadores para um sorteio.
-
-LÓGICA DA PROGRAMAÇÃO - BOLA E RAQUETE
-A paleta é dividida em oito segmentos, com o segmento central retornando a bola em um ângulo de 90º em relação a paleta
-e os segmentos externos retornando a bola em ângulos cada vez menores. A bola aumenta de velocidade cada vez que é
-rebatida, reiniciando a velocidade caso algum dos jogadores não acerte a bola.

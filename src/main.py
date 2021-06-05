@@ -19,7 +19,7 @@ def run(config_file):
     p.add_reporter(stats)
     p.add_reporter(neat.Checkpointer(5))
 
-    winner = p.run(PongTrain().run, 1000)
+    winner = p.run(PongTrain().run, 300)
     with open("winner.pkl", "wb") as f:
         pickle.dump(winner, f)
         f.close()
@@ -31,7 +31,6 @@ if __name__ == "__main__":
     print('Choose an option:')
     print('1 - Train')
     print('? - Play')
-
     # op = input('Choose: ')
     op = '1'
 
