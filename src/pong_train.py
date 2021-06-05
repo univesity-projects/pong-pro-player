@@ -307,14 +307,15 @@ class PongTrain:
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    genes[i].fitness += 20.0
+                    genes[i].fitness += 25.0
                     if not cur_left.moved_last_col:
                         genes[i].fitness -= 5.0
                         cur_left.moved_last_col = False
                     if cur_left.up_collision() or cur_left.down_collision():
                         genes[i].fitness -= 10.0
                 if cur_ball.dead:
-                    max_weight = 25.0
+                    # talvez 20
+                    max_weight = 20.0
                     dist = abs(cur_left.get_y() - cur_ball.get_y())
                     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
                     # print('distance: ',dist)

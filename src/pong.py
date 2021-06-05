@@ -284,7 +284,7 @@ class Pong:
     def load_ia():
         local_dir = os.path.dirname(__file__)
         config_path = os.path.join(local_dir, 'config-feedforward.txt')
-        with open('winner.pkl', "rb") as f:
+        with open('ia.pkl', "rb") as f:
             genome = pickle.load(f)
         return neat.nn.FeedForwardNetwork.create(genome, neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path))
 
@@ -364,27 +364,19 @@ class Pong:
 
         if self.mode == self.PLAYER_VS_PLAYER:
             # player left (HUMAN)
-            self.racket_left.up = self.k_w
-            self.racket_left.down = self.k_s
-            self.racket_left.update(self.delta)
+            self.update_left()
             # player right (HUMAN)
-            self.racket_right.up = self.k_up
-            self.racket_right.down = self.k_down
-            self.racket_right.update(self.delta)
+            self.update_right()
         elif self.mode == self.PLAYER_VS_MACHINE:
             # player left (MACHINE)
             self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
             # player right (HUMAN)
-            self.racket_right.up = self.k_up
-            self.racket_right.down = self.k_down
-            self.racket_right.update(self.delta)
+            self.update_right()
         elif self.mode == self.PLAYER_VS_IA:
             # player left (IA)
             self.update_ia()
             # player right (HUMAN)
-            self.racket_right.up = self.k_up
-            self.racket_right.down = self.k_down
-            self.racket_right.update(self.delta)
+            self.update_left()
         elif self.mode == self.IA_VS_MACHINE:
             # player left (IA)
             self.update_ia()
@@ -395,6 +387,16 @@ class Pong:
 
         if self.score_right >= 11 or self.score_left >= 11:
             self.state = self.STATE_END_GAME
+
+    def update_right(self):
+        self.racket_right.up = self.k_up
+        self.racket_right.down = self.k_down
+        self.racket_right.update(self.delta)
+
+    def update_left(self):
+        self.racket_right.up = self.k_up
+        self.racket_right.down = self.k_down
+        self.racket_right.update(self.delta)
 
     def update_ia(self):
         output = self.ia.activate((self.racket_left.get_y(), self.ball.get_x(), self.ball.get_y(), self.ball.x_speed, self.ball.y_speed))
