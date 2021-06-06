@@ -188,8 +188,8 @@ class Ball(Entity):
 
     def set_angle(self, angle_in_radians):
         speed = self.speed + (50 * self.slaps)
-        if speed > 1200:
-            speed = 1200
+        if speed > 1500:
+            speed = 1500
         # print(speed)
         self.x_speed = speed * math.cos(angle_in_radians)
         self.y_speed = speed * math.sin(angle_in_radians)

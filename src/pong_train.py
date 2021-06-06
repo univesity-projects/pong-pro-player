@@ -176,8 +176,8 @@ class Ball(Entity):
 
     def set_angle(self, angle_in_radians):
         speed = self.speed + (50 * self.slaps)
-        if speed > 1200:
-            speed = 1200
+        if speed > 1500:
+            speed = 1500
         self.x_speed = speed * math.cos(angle_in_radians)
         self.y_speed = speed * math.sin(angle_in_radians)
 
@@ -273,24 +273,24 @@ class PongTrain:
                 cur_left.update(self.delta)
                 cur_ball.update(self.delta)
 
-                # if cur_ball.col:
-                #     genes[i].fitness += 10.0
                 if cur_ball.col:
-                    genes[i].fitness += 25.0
-                    if not cur_left.moved_last_col:
-                        genes[i].fitness -= 2.5
-                        cur_left.moved_last_col = False
-                    if cur_left.up_collision() or cur_left.down_collision():
-                        genes[i].fitness -= 5.0
-                if cur_ball.dead:
-                    max_weight = 5.0
-                    dist = abs(cur_left.get_y() - cur_ball.get_y())
-                    fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
-                    # print('distance: ',dist)
-                    # print('fit before: ',genes[i].fitness)
-                    genes[i].fitness -= genes[i].fitness * fit
-                    # print('fit after: ',genes[i].fitness)
-                    # print('---')
+                    genes[i].fitness += 10.0# + cur_ball.slaps
+                # if cur_ball.col:
+                #     genes[i].fitness += 1.0
+                #     if not cur_left.moved_last_col:
+                #         genes[i].fitness -= 0.1
+                #         cur_left.moved_last_col = False
+                #     if cur_left.up_collision() or cur_left.down_collision():
+                #         genes[i].fitness -= 0.2
+                # if cur_ball.dead:
+                #     max_weight = 5.0
+                #     dist = abs(cur_left.get_y() - cur_ball.get_y())
+                #     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
+                #     # print('distance: ',dist)
+                #     # print('fit before: ',genes[i].fitness)
+                #     genes[i].fitness -= genes[i].fitness * fit
+                #     # print('fit after: ',genes[i].fitness)
+                #     # print('---')
 
             self.update()
             self.render()

@@ -32,7 +32,7 @@ if __name__ == "__main__":
     print('1 - Train')
     print('? - Play')
     # op = input('Choose: ')
-    op = '1'
+    op = '01'
 
     if op == '1':
         local_dir = os.path.dirname(__file__)
