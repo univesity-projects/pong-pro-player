@@ -58,9 +58,11 @@ class Racket(Entity):
     up = False
     down = False
 
-    def __init__(self, x, y, width, height, speed, parent, ball, color):
+    def __init__(self, x, y, width, height, speed, parent, ball, color, gen_id):
         Entity.__init__(self, x, y, width, height, speed, parent, color)
         self.ball = ball
+        self.gen_id = gen_id
+        self.negative = (255 - color[0], 255 - color[1], 255 - color[2])
 
         # pad
         self.super_pad = 0
@@ -80,6 +82,11 @@ class Racket(Entity):
             self.moved = True
             self.moved_last_col = True
             self.y += self.speed * delta
+
+    def render(self):
+        pygame.draw.rect(self.parent.screen, self.color, pygame.Rect(self.x, self.y, self.width, self.height))
+        r_id = self.parent.font_sm.render(str(self.gen_id), False, self.negative)
+        self.parent.screen.blit(r_id, (self.get_x() - r_id.get_width() / 2, self.get_y() - r_id.get_height() / 2))
 
     def out_limit(self):
         return self.ball.get_y() < 50
@@ -109,7 +116,7 @@ class Ball(Entity):
             self.dead = True
             self.racket_left.dead = True
             if self.get_x() > self.parent.DISPLAY_WIDTH:
-                print('RIGHT DEATH')
+                print('***** RIGHT DEATH *****')
                 sys.exit()
 
     def collision(self):
@@ -195,7 +202,7 @@ class PongTrain:
         pygame.init()
         icon = pygame.image.load('src/res/icon.png')
         pygame.display.set_icon(icon)
-        pygame.display.set_caption("Pong Train")
+        pygame.display.set_caption('Pong Train')
         self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
         random.seed(time.time())
 
@@ -211,7 +218,8 @@ class PongTrain:
 
         # sprites
         self.clean_color = self.BLACK
-        self.font = pygame.font.Font(pygame.font.get_default_font(), 24)
+        self.font_sm = pygame.font.Font(pygame.font.get_default_font(), 12)
+        self.font_md = pygame.font.Font(pygame.font.get_default_font(), 24)
 
         # objects
         self.left_rackets = []
@@ -240,9 +248,8 @@ class PongTrain:
             net = neat.nn.FeedForwardNetwork.create(genome, config)
             nets.append(net)
             genes.append(genome)
-
             color = (random.randint(55, 255), random.randint(55, 255), random.randint(55, 255))
-            racket_left = Racket(50, mid, 16, 64, speed, self, None, color)
+            racket_left = Racket(50, mid, 16, 64, speed, self, None, color, genome_id)
             ball = Ball(400, mid, 16, 16, 600, self, racket_left, color)
             racket_left.ball = ball
             ball.generate()
@@ -274,31 +281,13 @@ class PongTrain:
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    genes[i].fitness += 10.0# + cur_ball.slaps
-                # if cur_ball.col:
-                #     genes[i].fitness += 1.0
-                #     if not cur_left.moved_last_col:
-                #         genes[i].fitness -= 0.1
-                #         cur_left.moved_last_col = False
-                #     if cur_left.up_collision() or cur_left.down_collision():
-                #         genes[i].fitness -= 0.2
-                # if cur_ball.dead:
-                #     max_weight = 5.0
-                #     dist = abs(cur_left.get_y() - cur_ball.get_y())
-                #     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
-                #     # print('distance: ',dist)
-                #     # print('fit before: ',genes[i].fitness)
-                #     genes[i].fitness -= genes[i].fitness * fit
-                #     # print('fit after: ',genes[i].fitness)
-                #     # print('---')
+                    # genes[i].fitness += 10.0 + cur_ball.slaps
+                    genes[i].fitness += 10.0
 
             self.update()
             self.render()
 
             # remove ended games
-            # self.balls = [value for value in self.balls if not value.dead]
-            # self.left_rackets = [value for value in self.left_rackets if not value.dead]
-            # self.right_rackets = [value for value in self.right_rackets if not value.dead]
             for i, ball in enumerate(self.balls):
                 if ball.dead:
                     self.balls.pop(i)
@@ -355,9 +344,10 @@ class PongTrain:
 
     def draw_data(self):
         str1 = 'POP: ' + str(len(self.balls)) + ' / GEN: ' + str(self.gen)
-        text1 = self.font.render(str1, False, self.WHITE)
+        text1 = self.font_md.render(str1, False, self.WHITE)
         pygame.draw.rect(self.screen, self.BLACK, (100, 0, text1.get_width() + 20, text1.get_height() + 10))
         self.screen.blit(text1, (120, 10))
 
     def draw_net(self):
         pygame.draw.rect(self.screen, self.WHITE, pygame.Rect(self.DISPLAY_WIDTH / 2 - 4, 0, 8, self.DISPLAY_HEIGHT))
+        pygame.draw.rect(self.screen, self.WHITE, pygame.Rect(self.DISPLAY_WIDTH - 42, 0, 42, self.DISPLAY_HEIGHT))

@@ -230,7 +230,7 @@ class Pong:
         pygame.init()
         icon = pygame.image.load('src/res/icon.png')
         pygame.display.set_icon(icon)
-        pygame.display.set_caption("Pong")
+        pygame.display.set_caption('Pong')
         self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
         random.seed(time.time())
 
@@ -311,7 +311,7 @@ class Pong:
     def load_ia():
         local_dir = os.path.dirname(__file__)
         config_path = os.path.join(local_dir, 'config-feedforward.txt')
-        with open('s25,nm-5,e-15__af(relu),mr25__winner.pkl', "rb") as f:
+        with open('winner.pkl', 'rb') as f:
             genome = pickle.load(f)
         return neat.nn.FeedForwardNetwork.create(genome, neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path))
 
@@ -634,3 +634,7 @@ class Pong:
     def draw_overlay_effects(self):
         self.screen.blit(self.sprite_scanline, (0, 0))
         self.screen.blit(self.sprite_tv_vignette, (0, 0))
+
+
+if __name__ == '__main__':
+    Pong().run()
