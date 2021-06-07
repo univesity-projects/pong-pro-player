@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import copy
 import sys
 
 import neat
@@ -103,6 +104,9 @@ class Ball(Entity):
 
         # checks
         self.col = False
+        self.col_y = 0
+        self.calculated = False
+        self.right_pos = False
 
     def update(self, delta):
         self.col = False
@@ -115,9 +119,34 @@ class Ball(Entity):
         if self.get_x() < 0:
             self.dead = True
             self.racket_left.dead = True
-            if self.get_x() > self.parent.DISPLAY_WIDTH:
-                print('***** RIGHT DEATH *****')
-                sys.exit()
+
+        if self.x_speed < 0 and not self.calculated:
+            x = copy.copy(self.x)
+            y = copy.copy(self.y)
+            x_speed = copy.copy(self.x_speed)
+            y_speed = copy.copy(self.y_speed)
+            while True:
+                if x <= 50:
+                    self.col_y = y + self.height / 2
+                    self.calculated = True
+                    break
+                if y + self.height >= self.parent.DISPLAY_HEIGHT or y <= 0:
+                    y_speed *= -1
+                x += x_speed
+                y += y_speed
+
+        self.right_pos = self.racket_left.y < self.col_y < self.racket_left.y + self.racket_left.height
+
+        # if self.calculated:
+        #     print('rack y: ', self.racket_left.y)
+        #     print('rack y + height: ', self.racket_left.y + self.racket_left.height)
+        #     print('ball cent y: ', self.get_y())
+        #     print('ball predict y: ', self.col_y)
+        #     print('right pos: ', self.right_pos)
+        #
+        #     # time.sleep(10)
+        #     while not self.parent.k_esc:
+        #         pass
 
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
@@ -127,9 +156,20 @@ class Ball(Entity):
         if ball_rect.colliderect(racket_left_rect):
             self.racket_left.moved_last_col = False
             self.col = True
+            self.calculated = False
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
+
+            print('rack y: ', self.racket_left.y)
+            print('rack y + height: ', self.racket_left.y + self.racket_left.height)
+            print('ball cent y: ', self.get_y())
+            print('ball predict y: ', self.col_y)
+            print('right pos: ', self.right_pos)
+
+            while not self.parent.k_esc:
+                pass
+
         elif self.get_x() >= self.parent.DISPLAY_WIDTH - 50:
             num = self.racket_left.height / 2 - 1
             racket_y = self.get_y() + random.randint(int(-num), num)
@@ -243,13 +283,15 @@ class PongTrain:
 
         speed = 800
         mid = self.DISPLAY_HEIGHT / 2
+        i = 0
         for genome_id, genome in genomes:
             genome.fitness = 0
             net = neat.nn.FeedForwardNetwork.create(genome, config)
             nets.append(net)
             genes.append(genome)
             color = (random.randint(55, 255), random.randint(55, 255), random.randint(55, 255))
-            racket_left = Racket(50, mid, 16, 64, speed, self, None, color, genome_id)
+            racket_left = Racket(50, mid, 16, 64, speed, self, None, color, i)
+            i += 1
             ball = Ball(400, mid, 16, 16, 600, self, racket_left, color)
             racket_left.ball = ball
             ball.generate()
@@ -281,8 +323,19 @@ class PongTrain:
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    # genes[i].fitness += 10.0 + cur_ball.slaps
                     genes[i].fitness += 10.0
+                    # genes[i].fitness += 10.0
+                if cur_ball.right_pos:
+                    genes[i].fitness += 0.5
+                # else:
+                #     max_weight = 1.0
+                #     dist = abs(cur_left.get_y() - cur_ball.get_y())
+                #     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
+                #     # print('distance: ',dist)
+                #     # print('fit before: ',genes[i].fitness)
+                #     genes[i].fitness += 1.0 * fit
+                #     # print('fit after: ',genes[i].fitness)
+                #     # print('---')
 
             self.update()
             self.render()
