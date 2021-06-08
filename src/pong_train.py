@@ -132,8 +132,8 @@ class Ball(Entity):
                     break
                 if y + self.height >= self.parent.DISPLAY_HEIGHT or y <= 0:
                     y_speed *= -1
-                x += x_speed
-                y += y_speed
+                x += x_speed * delta
+                y += y_speed * delta
 
         self.right_pos = self.racket_left.y < self.col_y < self.racket_left.y + self.racket_left.height
 
@@ -161,14 +161,14 @@ class Ball(Entity):
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
 
-            print('rack y: ', self.racket_left.y)
-            print('rack y + height: ', self.racket_left.y + self.racket_left.height)
-            print('ball cent y: ', self.get_y())
-            print('ball predict y: ', self.col_y)
-            print('right pos: ', self.right_pos)
+            # print('rack y: ', self.racket_left.y)
+            # print('rack y + height: ', self.racket_left.y + self.racket_left.height)
+            # print('ball cent y: ', self.get_y())
+            # print('ball predict y: ', self.col_y)
+            # print('right pos: ', self.right_pos)
 
-            while not self.parent.k_esc:
-                pass
+            # while not self.parent.k_esc:
+            #     pass
 
         elif self.get_x() >= self.parent.DISPLAY_WIDTH - 50:
             num = self.racket_left.height / 2 - 1
@@ -337,9 +337,6 @@ class PongTrain:
                 #     # print('fit after: ',genes[i].fitness)
                 #     # print('---')
 
-            self.update()
-            self.render()
-
             # remove ended games
             for i, ball in enumerate(self.balls):
                 if ball.dead:
@@ -347,6 +344,9 @@ class PongTrain:
                     self.left_rackets.pop(i)
                     nets.pop(i)
                     genes.pop(i)
+
+            self.update()
+            self.render()
 
     def update(self):
         self.update_events()
