@@ -249,8 +249,7 @@ class Pong:
         self.sprite_tv_vignette = pygame.image.load('res/sprite/tv_vignette_overlay.png')
         self.sprite_num = []
         for i in range(10):
-            self.sprite_num.append(
-                self.sprite_load_scaled('res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
+            self.sprite_num.append(self.sprite_load_scaled('res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
         self.sprite_net = self.sprite_load_scaled('res/sprite/net.png', self.SCALE)
         sprite_ball = self.sprite_load_scaled('res/sprite/ball.png', self.SCALE)
         sprite_racket = self.sprite_load_scaled('res/sprite/racket.png', self.SCALE)

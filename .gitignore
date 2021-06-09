@@ -75,6 +75,7 @@ fabric.properties
 .idea/pong-pro-player.iml
 .idea/misc.xml
 venv/
+__pycache__/
 
 # NEAT
 neat-checkpoint-*
