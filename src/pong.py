@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
-import pickle
 
 import neat
+import pickle
 import pygame
 import math
 import random
+import os
 import time
 import operator
 
@@ -30,6 +30,9 @@ class Entity:
 
     def render(self):
         self.parent.screen.blit(self.sprite, (self.x, self.y))
+
+    def generate(self):
+        pass
 
     def set_x(self, x):
         self.x = x - self.width / 2
@@ -66,25 +69,18 @@ class Racket(Entity):
 
     def update(self, delta):
         if self.up and not self.up_collision():
-            self.y -= self.speed * delta
+            self.move_up(delta)
         elif self.down and not self.down_collision():
-            self.y += self.speed * delta
+            self.move_down(delta)
 
-    def update_machine(self, delta, player):
-        ball = self.parent.ball
+    def generate(self):
+        self.set_y(self.parent.DISPLAY_HEIGHT / 2)
 
-        # if the ball is coming to racket's' direction, it follow the ball
-        if (ball.x_speed < 0 and player == self.parent.PLAYER_LEFT) or (ball.x_speed > 0 and player == self.parent.PLAYER_RIGHT):
-            if ball.get_y() < self.get_y() - ball.height and not self.up_collision():
-                self.y -= self.speed * delta
-            elif ball.get_y() > self.get_y() + ball.height and not self.down_collision():
-                self.y += self.speed * delta
-        # else the racket just go to the middle of screen
-        else:
-            if self.get_y() > self.parent.DISPLAY_HEIGHT / 2 + ball.height:
-                self.y -= self.speed * delta
-            elif self.get_y() < self.parent.DISPLAY_HEIGHT / 2 - ball.height:
-                self.y += self.speed * delta
+    def move_up(self, delta):
+        self.y -= self.speed * delta
+
+    def move_down(self, delta):
+        self.y += self.speed * delta
 
 
 class Ball(Entity):
@@ -228,7 +224,7 @@ class Pong:
 
     def __init__(self):
         pygame.init()
-        icon = pygame.image.load('src/res/icon.png')
+        icon = pygame.image.load('res/icon.png')
         pygame.display.set_icon(icon)
         pygame.display.set_caption('Pong')
         self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
@@ -243,28 +239,28 @@ class Pong:
         self.k_esc = False
 
         # musics
-        self.snd_lose = pygame.mixer.Sound('src/res/sound/lose.ogg')
-        self.snd_racket_collision = pygame.mixer.Sound('src/res/sound/racket_collision.ogg')
-        self.snd_wall_collision = pygame.mixer.Sound('src/res/sound/wall_collision.ogg')
+        self.snd_lose = pygame.mixer.Sound('res/sound/lose.ogg')
+        self.snd_racket_collision = pygame.mixer.Sound('res/sound/racket_collision.ogg')
+        self.snd_wall_collision = pygame.mixer.Sound('res/sound/wall_collision.ogg')
 
         # sprites
         self.clean_color = self.DARK_GRAY
-        self.sprite_scanline = pygame.image.load('src/res/sprite/scanline_overlay.png')
-        self.sprite_tv_vignette = pygame.image.load('src/res/sprite/tv_vignette_overlay.png')
+        self.sprite_scanline = pygame.image.load('res/sprite/scanline_overlay.png')
+        self.sprite_tv_vignette = pygame.image.load('res/sprite/tv_vignette_overlay.png')
         self.sprite_num = []
         for i in range(10):
             self.sprite_num.append(
-                self.sprite_load_scaled('src/res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
-        self.sprite_net = self.sprite_load_scaled('src/res/sprite/net.png', self.SCALE)
-        sprite_ball = self.sprite_load_scaled('src/res/sprite/ball.png', self.SCALE)
-        sprite_racket = self.sprite_load_scaled('src/res/sprite/racket.png', self.SCALE)
-        self.font_title = pygame.font.Font('src/res/font/bit5x3.ttf', 128)
-        self.font_mid = pygame.font.Font('src/res/font/bit5x3.ttf', 94)
-        self.font = pygame.font.Font('src/res/font/bit5x3.ttf', 64)
+                self.sprite_load_scaled('res/sprite/sprite_num_' + str(i) + '.png', int(self.SCALE / 2)))
+        self.sprite_net = self.sprite_load_scaled('res/sprite/net.png', self.SCALE)
+        sprite_ball = self.sprite_load_scaled('res/sprite/ball.png', self.SCALE)
+        sprite_racket = self.sprite_load_scaled('res/sprite/racket.png', self.SCALE)
+        self.font_title = pygame.font.Font('res/font/bit5x3.ttf', 128)
+        self.font_mid = pygame.font.Font('res/font/bit5x3.ttf', 94)
+        self.font = pygame.font.Font('res/font/bit5x3.ttf', 64)
 
         # objects
         speed = 800
-        mid = 300
+        mid = self.DISPLAY_HEIGHT / 2
         self.racket_left = Racket(50, mid, 16, 64, speed, sprite_racket, self)
         self.racket_right = Racket(750, mid, 16, 64, speed, sprite_racket, self)
         self.ball = Ball(400, mid, 16, 16, 600, sprite_ball, self)
@@ -276,8 +272,7 @@ class Pong:
         self.mode = self.MODE_MACHINE_VS_MACHINE
         self.state = self.STATE_MAIN_MENU
         self.player_ball = self.NO_PLAYER
-        # self.state = self.STATE_END_GAME
-        self.ia = self.load_ia()
+        self.ai = self.load_ai()
         self.menu_op = 0
         self.score_left = 0
         self.score_right = 0
@@ -293,25 +288,25 @@ class Pong:
         while self.running:
             self.elapsed = self.clock.tick(60)
             self.delta = self.elapsed / 1000.0
+            self.events()
             self.update()
             self.render()
 
         pygame.quit()
 
-    def play(self, sound):
+    def play(self, playing_sound):
         if self.sound:
-            if sound == self.SND_LOSE:
+            if playing_sound == self.SND_LOSE:
                 self.snd_lose.play()
-            elif sound == self.SND_RACKET_COLLISION:
+            elif playing_sound == self.SND_RACKET_COLLISION:
                 self.snd_racket_collision.play()
-            elif sound == self.SND_WALL_COLLISION:
+            elif playing_sound == self.SND_WALL_COLLISION:
                 self.snd_wall_collision.play()
 
     @staticmethod
-    def load_ia():
-        local_dir = os.path.dirname(__file__)
-        config_path = os.path.join(local_dir, '../config-feedforward.txt')
-        with open('winner.pkl', 'rb') as f:
+    def load_ai():
+        config_path = os.path.join(os.getcwd(), 'config-feedforward.txt')
+        with open('res/ai_player', 'rb') as f:
             genome = pickle.load(f)
         return neat.nn.FeedForwardNetwork.create(genome, neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, config_path))
 
@@ -324,8 +319,8 @@ class Pong:
     def restart(self):
         self.score_left = 0
         self.score_right = 0
-        self.racket_left.set_y(self.DISPLAY_HEIGHT / 2)
-        self.racket_right.set_y(self.DISPLAY_HEIGHT / 2)
+        self.racket_left.generate()
+        self.racket_right.generate()
         self.start_match()
 
     def start_match(self):
@@ -343,8 +338,6 @@ class Pong:
         self.timer = 1
 
     def update(self):
-        self.update_events()
-
         if self.state == self.STATE_PLAYING:
             self.update_playing()
         elif self.state == self.STATE_MAIN_MENU or self.state == self.STATE_PAUSE_MENU or self.state == self.STATE_SEL_MODE_MENU:
@@ -354,7 +347,7 @@ class Pong:
         elif self.state == self.STATE_WAIT:
             self.update_wait()
 
-    def update_events(self):
+    def events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -391,61 +384,86 @@ class Pong:
 
         if self.mode == self.MODE_PLAYER_VS_PLAYER:
             # player left (HUMAN)
-            self.update_left()
+            self.update_human(self.PLAYER_LEFT)
             # player right (HUMAN)
-            self.update_right()
+            self.update_human(self.PLAYER_RIGHT)
         elif self.mode == self.MODE_PLAYER_VS_MACHINE:
             # player left (MACHINE)
-            self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
+            self.update_machine(self.PLAYER_LEFT)
             # player right (HUMAN)
-            self.update_right()
+            self.update_human(self.PLAYER_RIGHT)
         elif self.mode == self.MODE_PLAYER_VS_IA:
             # player left (IA)
-            self.update_ia()
+            self.update_ia(self.PLAYER_LEFT)
             # player right (HUMAN)
-            self.update_left()
+            self.update_human(self.PLAYER_RIGHT)
         elif self.mode == self.MODE_IA_VS_MACHINE:
             # player left (IA)
-            self.update_ia()
+            self.update_ia(self.PLAYER_LEFT)
             # player right (MACHINE)
-            self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
+            self.update_machine(self.PLAYER_RIGHT)
         elif self.mode == self.MODE_MACHINE_VS_MACHINE:
             # player left (MACHINE)
-            self.racket_left.update_machine(self.delta, self.PLAYER_LEFT)
+            self.update_machine(self.PLAYER_LEFT)
             # player right (MACHINE)
-            self.racket_right.update_machine(self.delta, self.PLAYER_RIGHT)
+            self.update_machine(self.PLAYER_RIGHT)
 
         self.ball.update(self.delta)
+        self.racket_left.update(self.delta)
+        self.racket_right.update(self.delta)
 
         if self.score_right >= 11 or self.score_left >= 11:
             self.state = self.STATE_END_GAME
 
-    def update_right(self):
-        self.racket_right.up = self.k_up
-        self.racket_right.down = self.k_down
-        self.racket_right.update(self.delta)
+    def update_machine(self, player):
+        ball = self.ball
+        racket = self.racket_left if player == self.PLAYER_LEFT else self.racket_right
 
-    def update_left(self):
-        self.racket_right.up = self.k_up
-        self.racket_right.down = self.k_down
-        self.racket_right.update(self.delta)
+        # if the ball is coming to racket's' direction, it follow the ball
+        if (ball.x_speed < 0 and player == self.PLAYER_LEFT) or (ball.x_speed > 0 and player == self.PLAYER_RIGHT):
+            if ball.get_y() < racket.get_y() - ball.height and not racket.up_collision():
+                racket.up = True
+                racket.down = False
+            elif ball.get_y() > racket.get_y() + ball.height and not racket.down_collision():
+                racket.up = False
+                racket.down = True
+            else:
+                racket.up = False
+                racket.down = False
+        # else the racket just go to the middle of screen
+        else:
+            if racket.get_y() > self.DISPLAY_HEIGHT / 2 + ball.height:
+                racket.up = True
+                racket.down = False
+            elif racket.get_y() < self.DISPLAY_HEIGHT / 2 - ball.height:
+                racket.up = False
+                racket.down = True
+            else:
+                racket.up = False
+                racket.down = False
 
-    def update_ia(self):
-        output = self.ia.activate((self.racket_left.get_y(), self.ball.get_x(), self.ball.get_y(), self.ball.x_speed, self.ball.y_speed))
+    def update_human(self, player):
+        if player == self.PLAYER_LEFT:
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
+        elif player == self.PLAYER_RIGHT:
+            self.racket_right.up = self.k_up
+            self.racket_right.down = self.k_down
 
-        # print(output)
+    def update_ia(self, player):
+        racket = self.racket_left if player == self.PLAYER_LEFT else self.racket_right
+
+        output = self.ai.activate((racket.get_y(), self.ball.get_x(), self.ball.get_y(), self.ball.x_speed, self.ball.y_speed))
 
         if output[0] >= 0.66:
-            self.racket_left.up = True
-            self.racket_left.down = False
+            racket.up = True
+            racket.down = False
         if 0.66 > output[0] > 0.33:
-            self.racket_left.up = False
-            self.racket_left.down = False
+            racket.up = False
+            racket.down = False
         if output[0] <= 0.33:
-            self.racket_left.up = False
-            self.racket_left.down = True
-
-        self.racket_left.update(self.delta)
+            racket.up = False
+            racket.down = True
 
     def update_menus(self):
         op_size = 3

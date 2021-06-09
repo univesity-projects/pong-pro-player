@@ -65,24 +65,17 @@ class Racket(Entity):
         self.gen_id = gen_id
         self.negative = (255 - color[0], 255 - color[1], 255 - color[2])
 
-        # pad
-        self.super_pad = 0
-
-        # checks
-        self.moved = False
-        self.moved_last_col = False
-
     def update(self, delta):
-        self.moved = False
-
         if self.up and not self.up_collision() and not self.out_limit():
-            self.moved = True
-            self.moved_last_col = True
-            self.y -= self.speed * delta
+            self.move_up(delta)
         elif self.down and not self.down_collision() and not self.out_limit():
-            self.moved = True
-            self.moved_last_col = True
-            self.y += self.speed * delta
+            self.move_down(delta)
+
+    def move_up(self, delta):
+        self.y -= self.speed * delta
+
+    def move_down(self, delta):
+        self.y += self.speed * delta
 
     def render(self):
         pygame.draw.rect(self.parent.screen, self.color, pygame.Rect(self.x, self.y, self.width, self.height))
@@ -102,15 +95,7 @@ class Ball(Entity):
         self.y_speed = 0
         self.slaps = 0
 
-        # checks
-        self.col = False
-        self.col_y = 0
-        self.calculated = False
-        self.right_pos = False
-
     def update(self, delta):
-        self.col = False
-
         self.x += self.x_speed * delta
         self.y += self.y_speed * delta
 
@@ -120,55 +105,15 @@ class Ball(Entity):
             self.dead = True
             self.racket_left.dead = True
 
-        if self.x_speed < 0 and not self.calculated:
-            x = copy.copy(self.x)
-            y = copy.copy(self.y)
-            x_speed = copy.copy(self.x_speed)
-            y_speed = copy.copy(self.y_speed)
-            while True:
-                if x <= 50:
-                    self.col_y = y + self.height / 2
-                    self.calculated = True
-                    break
-                if y + self.height >= self.parent.DISPLAY_HEIGHT or y <= 0:
-                    y_speed *= -1
-                x += x_speed * delta
-                y += y_speed * delta
-
-        self.right_pos = self.racket_left.y < self.col_y < self.racket_left.y + self.racket_left.height
-
-        # if self.calculated:
-        #     print('rack y: ', self.racket_left.y)
-        #     print('rack y + height: ', self.racket_left.y + self.racket_left.height)
-        #     print('ball cent y: ', self.get_y())
-        #     print('ball predict y: ', self.col_y)
-        #     print('right pos: ', self.right_pos)
-        #
-        #     # time.sleep(10)
-        #     while not self.parent.k_esc:
-        #         pass
-
     def collision(self):
         ball_rect = pygame.rect.Rect((self.x, self.y, self.width, self.height))
         racket_left_rect = pygame.rect.Rect((self.racket_left.x, self.racket_left.y, self.racket_left.width, self.racket_left.height))
 
         # check if the ball collided with left or right racket and set the new angle
         if ball_rect.colliderect(racket_left_rect):
-            self.racket_left.moved_last_col = False
-            self.col = True
-            self.calculated = False
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
-
-            # print('rack y: ', self.racket_left.y)
-            # print('rack y + height: ', self.racket_left.y + self.racket_left.height)
-            # print('ball cent y: ', self.get_y())
-            # print('ball predict y: ', self.col_y)
-            # print('right pos: ', self.right_pos)
-
-            # while not self.parent.k_esc:
-            #     pass
 
         elif self.get_x() >= self.parent.DISPLAY_WIDTH - 50:
             num = self.racket_left.height / 2 - 1
@@ -240,21 +185,13 @@ class PongTrain:
 
     def __init__(self):
         pygame.init()
-        icon = pygame.image.load('src/res/icon.png')
+        icon = pygame.image.load('res/icon.png')
         pygame.display.set_icon(icon)
         pygame.display.set_caption('Pong Train')
         self.screen = pygame.display.set_mode((self.DISPLAY_WIDTH, self.DISPLAY_HEIGHT))
         random.seed(time.time())
 
         self.gen = -1
-
-        # keys
-        self.k_up = False
-        self.k_down = False
-        self.k_w = False
-        self.k_s = False
-        self.k_enter = False
-        self.k_esc = False
 
         # sprites
         self.clean_color = self.BLACK
@@ -267,7 +204,6 @@ class PongTrain:
 
         # control
         self.running = True
-        self.mode = False
         self.clock = pygame.time.Clock()
         self.delta = 0
         self.elapsed = 0
@@ -323,19 +259,7 @@ class PongTrain:
                 cur_ball.update(self.delta)
 
                 if cur_ball.col:
-                    genes[i].fitness += 10.0
-                    # genes[i].fitness += 10.0
-                if cur_ball.right_pos:
-                    genes[i].fitness += 0.5
-                # else:
-                #     max_weight = 1.0
-                #     dist = abs(cur_left.get_y() - cur_ball.get_y())
-                #     fit = (max_weight * (dist / self.DISPLAY_HEIGHT)) / 100.0
-                #     # print('distance: ',dist)
-                #     # print('fit before: ',genes[i].fitness)
-                #     genes[i].fitness += 1.0 * fit
-                #     # print('fit after: ',genes[i].fitness)
-                #     # print('---')
+                    genes[i].fitness += 1.0
 
             # remove ended games
             for i, ball in enumerate(self.balls):
@@ -345,42 +269,18 @@ class PongTrain:
                     nets.pop(i)
                     genes.pop(i)
 
+            self.update_events()
             self.update()
             self.render()
 
     def update(self):
-        self.update_events()
+        pass
 
-    def update_events(self):
+    @staticmethod
+    def update_events():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    self.k_up = True
-                elif event.key == pygame.K_DOWN:
-                    self.k_down = True
-                elif event.key == pygame.K_w:
-                    self.k_w = True
-                elif event.key == pygame.K_s:
-                    self.k_s = True
-                elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
-                    self.k_enter = True
-                elif event.key == pygame.K_ESCAPE:
-                    self.k_esc = True
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_UP:
-                    self.k_up = False
-                elif event.key == pygame.K_DOWN:
-                    self.k_down = False
-                elif event.key == pygame.K_w:
-                    self.k_w = False
-                elif event.key == pygame.K_s:
-                    self.k_s = False
-                elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
-                    self.k_enter = False
-                elif event.key == pygame.K_ESCAPE:
-                    self.k_esc = False
 
     def render(self):
         self.screen.fill(self.clean_color)
@@ -402,5 +302,7 @@ class PongTrain:
         self.screen.blit(text1, (120, 10))
 
     def draw_net(self):
+        # pong net
         pygame.draw.rect(self.screen, self.WHITE, pygame.Rect(self.DISPLAY_WIDTH / 2 - 4, 0, 8, self.DISPLAY_HEIGHT))
+        # right wall
         pygame.draw.rect(self.screen, self.WHITE, pygame.Rect(self.DISPLAY_WIDTH - 42, 0, 42, self.DISPLAY_HEIGHT))
