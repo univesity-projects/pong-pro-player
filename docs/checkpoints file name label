@@ -1,8 +1,0 @@
-# project configs
-s  - slaps on the ball
-nm - not moved from the last slap
-e  - glued on the edge
-
-# net configs
-af - activation function
-mr - mutation rate
