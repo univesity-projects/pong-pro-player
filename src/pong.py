@@ -253,9 +253,9 @@ class Pong:
         self.sprite_net = self.sprite_load_scaled('res/sprite/net.png', self.SCALE)
         sprite_ball = self.sprite_load_scaled('res/sprite/ball.png', self.SCALE)
         sprite_racket = self.sprite_load_scaled('res/sprite/racket.png', self.SCALE)
-        self.font_title = pygame.font.Font('res/font/bit5x3.ttf', 128)
-        self.font_mid = pygame.font.Font('res/font/bit5x3.ttf', 94)
-        self.font = pygame.font.Font('res/font/bit5x3.ttf', 64)
+        self.font_lg = pygame.font.Font('res/font/bit5x3.ttf', 128)
+        self.font_md = pygame.font.Font('res/font/bit5x3.ttf', 94)
+        self.font_sm = pygame.font.Font('res/font/bit5x3.ttf', 64)
 
         # objects
         speed = 800
@@ -613,7 +613,7 @@ class Pong:
         op_pad = 0
 
         for i, op_str in enumerate(options_str):
-            str_s = self.font.size(op_str) + padding
+            str_s = self.font_sm.size(op_str) + padding
             str_size.append(str_s)
             pos.append((int(self.DISPLAY_WIDTH / 2 - str_s[0] / 2),
                         int(((self.DISPLAY_HEIGHT / 4) * 1.5 - str_s[1] / 2) + str_s[1] * op_pad),
@@ -621,15 +621,15 @@ class Pong:
                         str_s[1]))
             op_pad += 1.5
             if i == self.menu_op:
-                str_rend.append(self.font.render(options_str[i], False, self.BLACK))
+                str_rend.append(self.font_sm.render(options_str[i], False, self.BLACK))
                 pygame.draw.rect(self.screen, self.WHITE, pos[i])
             else:
-                str_rend.append(self.font.render(options_str[i], False, self.WHITE))
+                str_rend.append(self.font_sm.render(options_str[i], False, self.WHITE))
 
             pos_f.append(tuple(map(operator.add, pos[i], adjust)))
             self.screen.blit(str_rend[i], pos_f[i])
 
-        title = self.font_title.render(str_title, False, self.WHITE)
+        title = self.font_lg.render(str_title, False, self.WHITE)
         title_w = title.get_width()
         self.screen.blit(title, (int(self.DISPLAY_WIDTH / 2 - title_w / 2), 60))
 
@@ -638,9 +638,9 @@ class Pong:
         str2 = 'WINNER: ' + ('LEFT PLAYER' if self.score_left >= 11 else 'RIGHT PLAYER')
         str3 = 'ENTER TO CONTINUE'
 
-        text1 = self.font_mid.render(str1, False, self.WHITE)
-        text2 = self.font.render(str2, False, self.WHITE)
-        text3 = self.font.render(str3, False, self.WHITE)
+        text1 = self.font_md.render(str1, False, self.WHITE)
+        text2 = self.font_sm.render(str2, False, self.WHITE)
+        text3 = self.font_sm.render(str3, False, self.WHITE)
 
         pad_top = self.DISPLAY_HEIGHT * 0.16
 
