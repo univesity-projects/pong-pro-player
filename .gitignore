@@ -74,6 +74,7 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 .idea/pong-pro-player.iml
 .idea/misc.xml
+venv/
 
 # NEAT
 neat-checkpoint-*
