@@ -267,7 +267,7 @@ class Pong:
         # control
         self.running = False
         self.effects = True
-        self.sound = False
+        self.sound = True
         self.mode = self.MODE_MACHINE_VS_MACHINE
         self.state = self.STATE_MAIN_MENU
         self.player_ball = self.NO_PLAYER
