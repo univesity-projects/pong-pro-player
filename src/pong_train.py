@@ -94,10 +94,12 @@ class Ball(Entity):
         self.x_speed = 0
         self.y_speed = 0
         self.slaps = 0
+        self.col = False
 
     def update(self, delta):
         self.x += self.x_speed * delta
         self.y += self.y_speed * delta
+        self.col = False
 
         self.collision()
 
@@ -114,6 +116,7 @@ class Ball(Entity):
             racket_y = self.racket_left.get_y()
             racket_height = self.racket_left.height
             self.find_angle(0, racket_y, racket_height)
+            self.col = True
 
         elif self.get_x() >= self.parent.DISPLAY_WIDTH - 50:
             num = self.racket_left.height / 2 - 1
